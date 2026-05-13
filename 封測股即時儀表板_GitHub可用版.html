@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>封測股即時儀表板 GitHub版</title>
+
+<style>
+body{
+  margin:0;
+  background:#08111f;
+  color:#e5e7eb;
+  font-family:Arial,sans-serif;
+}
+header{
+  padding:20px;
+  border-bottom:1px solid #1f2937;
+}
+h1{
+  margin:0;
+}
+.sub{
+  color:#38bdf8;
+  margin-top:8px;
+}
+button{
+  margin-top:12px;
+  background:#1e293b;
+  color:white;
+  border:none;
+  border-radius:8px;
+  padding:8px 14px;
+  cursor:pointer;
+}
+.cards{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(300px,1fr));
+  gap:16px;
+  padding:20px;
+}
+.card{
+  background:#111827;
+  border:1px solid #374151;
+  border-radius:14px;
+  padding:18px;
+}
+.code{
+  color:#94a3b8;
+  font-size:.85rem;
+}
+.name{
+  font-size:1.2rem;
+  font-weight:bold;
+  margin-top:4px;
+}
+.price{
+  font-size:2rem;
+  font-weight:bold;
+  margin-top:14px;
+}
+.up{color:#34d399}
+.down{color:#f87171}
+.flat{color:#cbd5e1}
+
+.grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-top:16px;
+}
+
+.box{
+  background:#0f172a;
+  border-radius:8px;
+  padding:10px;
+}
+
+.label{
+  color:#94a3b8;
+  font-size:.75rem;
+}
+
+.val{
+  margin-top:4px;
+  font-weight:bold;
+}
+
+.loading{
+  text-align:center;
+  padding:40px;
+}
+
+#error{
+  margin:20px;
+  background:#450a0a;
+  color:#fecaca;
+  padding:14px;
+  border-radius:10px;
+  display:none;
+}
+
+footer{
+  padding:20px;
+  color:#64748b;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <h1>台灣封測股 即時儀表板</h1>
+
+  <div class="sub">
+    GitHub Pages 可用版本（CORS Proxy）
+  </div>
+
+  <button onclick="fetchData()">
+    重新整理
+  </button>
+
+  <div id="time" style="margin-top:10px;color:#94a3b8"></div>
+</header>
+
+<div id="error"></div>
+
+<div id="loading" class="loading">
+  正在讀取資料...
+</div>
+
+<div id="cards" class="cards"></div>
+
+<footer>
+資料來源：TWSE OpenAPI + allorigins proxy<br>
+每60秒自動更新
+</footer>
+
+<script>
+
+const STOCKS = {
+  '3711': {name:'日月光投控', epsGrowth:89, analyst:400},
+  '6239': {name:'力成', epsGrowth:47, analyst:265},
+  '2449': {name:'京元電子', epsGrowth:10, analyst:350},
+  '8150': {name:'南茂', epsGrowth:3, analyst:null},
+};
+
+function num(v){
+  if(v===null || v===undefined) return null;
+  const n = parseFloat(String(v).replace(/,/g,''));
+  return isNaN(n) ? null : n;
+}
+
+function fmt(v,d=2){
+  if(v===null || v===undefined || isNaN(v)) return '—';
+  return Number(v).toFixed(d);
+}
+
+async function fetchData(){
+
+  document.getElementById('error').style.display='none';
+
+  try{
+
+    // 使用 allorigins 解決 GitHub.io CORS
+    const target =
+      encodeURIComponent(
+        'https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL'
+      );
+
+    const url =
+      'https://api.allorigins.win/raw?url=' + target;
+
+    const res = await fetch(url);
+
+    if(!res.ok){
+      throw new Error('Proxy API 無法連線');
+    }
+
+    const data = await res.json();
+
+    render(data);
+
+    document.getElementById('time').innerHTML =
+      '最後更新：' +
+      new Date().toLocaleTimeString('zh-TW');
+
+  }catch(err){
+
+    const el = document.getElementById('error');
+
+    el.style.display='block';
+
+    el.innerHTML =
+      'API 讀取失敗：' + err.message;
+
+  }
+
+  document.getElementById('loading').style.display='none';
+
+}
+
+function render(data){
+
+  const rows = [];
+
+  data.forEach(item=>{
+
+    const code = item.Code;
+
+    if(!STOCKS[code]) return;
+
+    const meta = STOCKS[code];
+
+    rows.push({
+      code,
+      name:meta.name,
+      epsGrowth:meta.epsGrowth,
+      analyst:meta.analyst,
+      price:num(item.ClosingPrice),
+      open:num(item.OpeningPrice),
+      high:num(item.HighestPrice),
+      low:num(item.LowestPrice),
+      change:num(item.Change),
+      volume:num(item.TradeVolume)
+    });
+
+  });
+
+  const cards = document.getElementById('cards');
+
+  cards.innerHTML = rows.map(r=>{
+
+    const cls =
+      r.change > 0 ? 'up' :
+      r.change < 0 ? 'down' :
+      'flat';
+
+    return `
+      <div class="card">
+
+        <div class="code">${r.code}</div>
+
+        <div class="name">
+          ${r.name}
+        </div>
+
+        <div class="price">
+          $${fmt(r.price)}
+        </div>
+
+        <div class="${cls}">
+          ${r.change>0?'▲':''}
+          ${fmt(r.change)}
+        </div>
+
+        <div class="grid">
+
+          <div class="box">
+            <div class="label">開盤</div>
+            <div class="val">${fmt(r.open)}</div>
+          </div>
+
+          <div class="box">
+            <div class="label">最高</div>
+            <div class="val">${fmt(r.high)}</div>
+          </div>
+
+          <div class="box">
+            <div class="label">最低</div>
+            <div class="val">${fmt(r.low)}</div>
+          </div>
+
+          <div class="box">
+            <div class="label">成交量</div>
+            <div class="val">
+              ${r.volume ? Number(r.volume).toLocaleString() : '—'}
+            </div>
+          </div>
+
+          <div class="box">
+            <div class="label">EPS 年增率</div>
+            <div class="val">${r.epsGrowth}%</div>
+          </div>
+
+          <div class="box">
+            <div class="label">法人目標價</div>
+            <div class="val">
+              ${r.analyst ? '$'+r.analyst : '—'}
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    `;
+
+  }).join('');
+
+}
+
+fetchData();
+
+setInterval(fetchData,60000);
+
+</script>
+
+</body>
+</html>
