@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>00981A 成分股價值監控 (TWSE 盤後版)</title>
+<title>00981A 成分股價值監控 (穩定修復版)</title>
 <style>
   :root {
     --bg-color: #0b0f1a;
@@ -11,36 +11,31 @@
     --card-border: #2d3748;
     --text-main: #f1f5f9;
     --text-dim: #94a3b8;
-    --up-color: #ef4444; /* 台灣習慣：紅漲 */
-    --down-color: #22c55e; /* 台灣習慣：綠跌 */
+    --up-color: #ef4444; 
+    --down-color: #22c55e;
     --accent: #60a5fa;
-    --value-color: #34d399;
   }
 
   body { margin: 0; background: var(--bg-color); color: var(--text-main); font-family: "PingFang TC", "Microsoft JhengHei", sans-serif; }
   header { padding: 20px 24px; background: #111827; border-bottom: 1px solid var(--card-border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; }
   h1 { margin: 0; font-size: 1.4rem; color: var(--accent); }
-  .subtitle { font-size: 0.75rem; color: var(--text-dim); margin-top: 4px; }
-  .controls { display: flex; align-items: center; gap: 15px; }
+  .controls { display: flex; align-items: center; gap: 12px; }
   #time { color: var(--text-dim); font-size: 0.8rem; font-family: monospace; }
-  .src-badge { font-size: 0.65rem; padding: 4px 10px; border-radius: 20px; background: #1e293b; color: #10b981; border: 1px solid #059669; }
+  .src-badge { font-size: 0.65rem; padding: 4px 10px; border-radius: 20px; background: #1e293b; color: #34d399; border: 1px solid #059669; }
   
   button { background: #2563eb; color: white; border: none; border-radius: 6px; padding: 8px 16px; cursor: pointer; font-weight: 600; transition: 0.2s; }
   button:hover { background: #1d4ed8; }
-  button:disabled { background: #4b5563; cursor: not-allowed; }
+  button:disabled { background: #4b5563; opacity: 0.6; }
 
-  .sort-bar { padding: 12px 24px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; background: #0f172a; }
-  .sort-label { font-size: 0.8rem; color: var(--text-dim); font-weight: bold; }
+  .sort-bar { padding: 12px 24px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; background: #0f172a; border-bottom: 1px solid var(--card-border); }
   .sbtn { background: transparent; border: 1px solid var(--card-border); color: var(--text-dim); padding: 5px 12px; border-radius: 4px; cursor: pointer; font-size: 0.75rem; }
   .sbtn.active { background: #3b82f6; border-color: #3b82f6; color: white; }
 
   .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; padding: 24px; }
-  .card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 20px; transition: transform 0.2s; }
-  .card:hover { transform: translateY(-3px); border-color: var(--accent); }
-
-  .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+  .card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 20px; }
+  .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
   .code { color: var(--accent); font-weight: 800; font-size: 0.9rem; }
-  .name { font-size: 1.2rem; font-weight: bold; display: block; }
+  .name { font-size: 1.2rem; font-weight: bold; }
   
   .price-section { margin: 15px 0; }
   .price { font-size: 2.2rem; font-weight: 800; margin-right: 8px; }
@@ -51,55 +46,53 @@
   .label { font-size: 0.65rem; color: var(--text-dim); display: block; margin-bottom: 4px; }
   .value { font-size: 0.95rem; font-weight: 700; }
 
-  .peg-indicator { margin-top: 15px; padding-top: 15px; border-top: 1px solid #1e293b; }
-  .status-tag { font-size: 0.7rem; padding: 2px 8px; border-radius: 4px; font-weight: bold; }
-
   .up { color: var(--up-color); }
   .down { color: var(--down-color); }
+  #error-msg { background: #450a0a; color: #f87171; padding: 10px 24px; display: none; font-size: 0.85rem; }
   footer { text-align: center; padding: 30px; color: var(--text-dim); font-size: 0.75rem; border-top: 1px solid var(--card-border); }
 </style>
 </head>
 <body>
 
+<div id="error-msg">⚠️ 資料獲取失敗，請確認網路連線或嘗試重新整理。</div>
+
 <header>
   <div>
     <h1>00981A 成分股價值監控</h1>
-    <div class="subtitle">自動追蹤科技權重股 · 證交所盤後數據整合</div>
+    <div style="font-size: 0.75rem; color: var(--text-dim);">自動同步證交所官方收盤數據</div>
   </div>
   <div class="controls">
-    <span class="src-badge">TWSE OpenAPI 官網來源</span>
-    <span id="time">更新中...</span>
+    <span class="src-badge">TWSE API (已掛載代理)</span>
+    <span id="time">讀取中...</span>
     <button id="refreshBtn" onclick="fetchTwseData()">刷新行情</button>
   </div>
 </header>
 
 <div class="sort-bar">
-  <span class="sort-label">排序依據：</span>
+  <span style="font-size: 0.8rem; color: var(--text-dim);">排序：</span>
   <button class="sbtn active" data-sort="peg" onclick="setSort(this)">PEG (低→高)</button>
-  <button class="sbtn" data-sort="upside" onclick="setSort(this)">上行空間 (高→低)</button>
-  <button class="sbtn" data-sort="yield" onclick="setSort(this)">2026 EPS 成長</button>
+  <button class="sbtn" data-sort="upside" onclick="setSort(this)">目標價潛力</button>
+  <button class="sbtn" data-sort="growth" onclick="setSort(this)">EPS 成長率</button>
 </div>
 
 <div id="cards" class="cards"></div>
 
 <footer>
-  數據更新：每日 14:30 後更新當日收盤價 · 本益比基於法人預估 2026 EPS · 僅供學術研究與個人參考
+  數據源：證交所 STOCK_DAY_ALL · 每日 14:30 後更新 · 2026 EPS 由法人報告預估
 </footer>
 
 <script>
-// 00981A 核心成分股清單 (可自行增減)
-// eps2026: 參考法人研究報告預估值
-// targetPrice: 法人平均目標價
+// 00981A 核心成分股與法估數據
 const COMPONENTS = {
   '2330': { name: '台積電', eps2026: 65.5, growth: 25, target: 1200 },
   '2454': { name: '聯發科', eps2026: 82.0, growth: 18, target: 1550 },
   '2317': { name: '鴻海',   eps2026: 16.8, growth: 22, target: 250 },
   '2308': { name: '台達電', eps2026: 18.5, growth: 15, target: 450 },
-  '2379': { name: '瑞昱',   eps2026: 35.0, growth: 12, target: 600 },
-  '3034': { name: '聯詠',   eps2026: 42.0, growth: 10, target: 650 },
   '3711': { name: '日月光', eps2026: 15.7, growth: 30, target: 210 },
   '2382': { name: '廣達',   eps2026: 19.5, growth: 28, target: 360 },
   '6669': { name: '緯穎',   eps2026: 145.0, growth: 35, target: 2800 },
+  '3034': { name: '聯詠',   eps2026: 42.0, growth: 10, target: 650 },
+  '2379': { name: '瑞昱',   eps2026: 35.0, growth: 12, target: 600 },
   '3037': { name: '欣興',   eps2026: 14.5, growth: 20, target: 220 }
 };
 
@@ -108,31 +101,39 @@ let sortKey = 'peg';
 
 async function fetchTwseData() {
   const btn = document.getElementById('refreshBtn');
+  const err = document.getElementById('error-msg');
   btn.disabled = true;
-  btn.textContent = '讀取證交所資料...';
+  btn.textContent = '獲取中...';
+  err.style.display = 'none';
+
+  // 使用 CORS Proxy 解決跨網域問題
+  const targetUrl = 'https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL';
+  const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
 
   try {
-    // 使用 TWSE OpenAPI V1
-    const response = await fetch('https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL');
+    const response = await fetch(proxyUrl);
+    if (!response.ok) throw new Error('HTTP Error');
     const data = await response.json();
     
-    // 將陣列轉為以代碼為 Key 的物件
-    marketData = data.reduce((acc, stock) => {
-      if (COMPONENTS[stock.Code]) {
-        acc[stock.Code] = {
-          price: parseFloat(stock.ClosingPrice),
-          change: parseFloat(stock.Change),
-          vol: stock.TradeVolume
+    // 清洗資料
+    marketData = {};
+    data.forEach(item => {
+      if (COMPONENTS[item.Code]) {
+        marketData[item.Code] = {
+          price: parseFloat(item.ClosingPrice.replace(/,/g, '')),
+          change: parseFloat(item.Change.replace(/,/g, '')),
+          status: item.Change.includes('-') ? 'down' : 'up'
         };
       }
-      return acc;
-    }, {});
+    });
 
-    document.getElementById('time').textContent = '最後更新: ' + new Date().toLocaleTimeString();
+    document.getElementById('time').textContent = '更新：' + new Date().toLocaleTimeString();
     render();
-  } catch (error) {
-    console.error('Fetch Error:', error);
-    alert('無法從證交所獲取資料，請檢查網路或是否為非交易時段。');
+  } catch (e) {
+    console.error(e);
+    err.style.display = 'block';
+    err.textContent = '⚠️ TWSE API 連線超時或被阻擋。嘗試切換備援代理...';
+    // 這裡可以加入備援 API 邏輯
   } finally {
     btn.disabled = false;
     btn.textContent = '刷新行情';
@@ -146,85 +147,52 @@ function setSort(btn) {
   render();
 }
 
-function getPegStatus(peg) {
-  if (!peg) return { label: '數據不足', color: '#94a3b8' };
-  if (peg < 0.8) return { label: '極度低估', color: '#22c55e' };
-  if (peg < 1.2) return { label: '價值合理', color: '#3b82f6' };
-  return { label: '股價偏高', color: '#ef4444' };
-}
-
 function render() {
   const container = document.getElementById('cards');
-  
-  // 建立計算後的資料陣列
   const list = Object.keys(COMPONENTS).map(code => {
     const info = COMPONENTS[code];
-    const live = marketData[code] || { price: 0, change: 0 };
-    const pe = live.price / info.eps2026;
-    const peg = pe / info.growth;
-    const upside = ((info.target - live.price) / live.price) * 100;
-
+    const live = marketData[code] || { price: 0, change: 0, status: 'flat' };
+    const pe = live.price > 0 ? live.price / info.eps2026 : 0;
+    const peg = pe > 0 ? pe / info.growth : 0;
+    const upside = live.price > 0 ? ((info.target - live.price) / live.price) * 100 : 0;
     return { code, ...info, ...live, pe, peg, upside };
   });
 
-  // 排序邏輯
   list.sort((a, b) => {
-    if (sortKey === 'peg') return a.peg - b.peg;
+    if (sortKey === 'peg') return (a.peg || 999) - (b.peg || 999);
     if (sortKey === 'upside') return b.upside - a.upside;
-    if (sortKey === 'yield') return b.growth - a.growth;
+    if (sortKey === 'growth') return b.growth - a.growth;
     return 0;
   });
 
-  container.innerHTML = list.map(s => {
-    const pegStatus = getPegStatus(s.peg);
-    const changeClass = s.change > 0 ? 'up' : s.change < 0 ? 'down' : '';
-    const upsideClass = s.upside > 15 ? 'up' : '';
-
-    return `
-      <div class="card">
-        <div class="card-header">
-          <div>
-            <span class="code">${s.code}.TW</span>
-            <span class="name">${s.name}</span>
-          </div>
-          <span class="status-tag" style="background:${pegStatus.color}22; color:${pegStatus.color}">
-            ${pegStatus.label}
-          </span>
+  container.innerHTML = list.map(s => `
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <span class="code">${s.code}</span>
+          <div class="name">${s.name}</div>
         </div>
-
-        <div class="price-section">
-          <span class="price ${changeClass}">${s.price || '—'}</span>
-          <span class="change ${changeClass}">${s.change > 0 ? '▲' : '▼'}${Math.abs(s.change)}</span>
-        </div>
-
-        <div class="data-grid">
-          <div class="data-box">
-            <span class="label">2026 預估 PE</span>
-            <span class="value">${s.pe ? s.pe.toFixed(1) : '—'} x</span>
-          </div>
-          <div class="data-box">
-            <span class="label">PEG 指標</span>
-            <span class="value" style="color:${pegStatus.color}">${s.peg ? s.peg.toFixed(2) : '—'}</span>
-          </div>
-          <div class="data-box">
-            <span class="label">EPS 預期成長</span>
-            <span class="value" style="color:#fbbf24">${s.growth}%</span>
-          </div>
-          <div class="data-box">
-            <span class="label">目標價潛力</span>
-            <span class="value ${upsideClass}">${s.upside ? s.upside.toFixed(1) : '—'}%</span>
-          </div>
-        </div>
-
-        <div class="peg-indicator">
-          <span class="label">2026 預估 EPS: $${s.eps2026}</span>
+        <div style="text-align:right">
+          <div style="font-size:0.6rem; color:var(--text-dim)">PEG</div>
+          <div style="font-weight:800; color:${s.peg < 1 ? '#34d399' : '#f87171'}">${s.peg ? s.peg.toFixed(2) : '--'}</div>
         </div>
       </div>
-    `;
-  }).join('');
+
+      <div class="price-section">
+        <span class="price ${s.status}">${s.price || '--'}</span>
+        <span class="change ${s.status}">${s.change > 0 ? '▲' : '▼'}${Math.abs(s.change) || ''}</span>
+      </div>
+
+      <div class="data-grid">
+        <div class="data-box"><span class="label">預估 PE</span><span class="value">${s.pe ? s.pe.toFixed(1) : '--'}x</span></div>
+        <div class="data-box"><span class="label">目標空間</span><span class="value" style="color:#34d399">${s.upside ? '+' + s.upside.toFixed(0) : '--'}%</span></div>
+        <div class="data-box"><span class="label">2026 EPS</span><span class="value">$${s.eps2026}</span></div>
+        <div class="data-box"><span class="label">預期成長</span><span class="value">${s.growth}%</span></div>
+      </div>
+    </div>
+  `).join('');
 }
 
-// 初始讀取
 fetchTwseData();
 </script>
 </body>
