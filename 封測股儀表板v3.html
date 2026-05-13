@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>台灣封測族群儀表板</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #080d14; color: #e2e8f0; font-family: 'Courier New', monospace; min-height: 100vh; padding-bottom: 32px; }
+.grid-bg { position: fixed; inset: 0; pointer-events: none; background-image: linear-gradient(rgba(56,189,248,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(56,189,248,.04) 1px,transparent 1px); background-size: 40px 40px; }
+header { display: flex; justify-content: space-between; align-items: flex-end; padding: 20px 20px 14px; border-bottom: 1px solid #1e293b; background: linear-gradient(180deg,#0f172a,transparent); position: relative; z-index: 1; flex-wrap: wrap; gap: 10px; }
+.eyebrow { font-size: .6rem; color: #38bdf8; letter-spacing: .15em; text-transform: uppercase; margin-bottom: 4px; }
+h1 { font-size: 1.25rem; font-weight: 700; color: #f1f5f9; letter-spacing: .05em; }
+.hright { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.upd { font-size: .7rem; color: #64748b; }
+.fetch-btn { background: #0f172a; border: 1px solid #38bdf8; color: #38bdf8; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: .82rem; font-weight: 600; font-family: inherit; }
+.fetch-btn:disabled { opacity: .5; cursor: not-allowed; }
+.err { background: #450a0a; border: 1px solid #991b1b; color: #fca5a5; padding: 10px 20px; font-size: .78rem; position: relative; z-index: 1; }
+.intro { padding: 28px 20px; color: #94a3b8; font-size: .85rem; line-height: 1.8; position: relative; z-index: 1; }
+.intro strong { color: #38bdf8; }
+.sort-bar { display: flex; align-items: center; gap: 8px; padding: 14px 20px 0; position: relative; z-index: 1; flex-wrap: wrap; }
+.sort-lbl { font-size: .7rem; color: #64748b; }
+.sbtn { background: transparent; border: 1px solid #1e293b; color: #64748b; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: .68rem; font-family: inherit; }
+.sbtn.active { background: #1e293b; border-color: #38bdf8; color: #38bdf8; }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; padding: 16px 20px 0; position: relative; z-index: 1; }
+.card { background: #0d1727; border: 1px solid #1e293b; border-radius: 12px; padding: 16px; position: relative; overflow: hidden; }
+.card-glow { position: absolute; inset: 0; border-radius: 12px; pointer-events: none; }
+.card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.card-code { font-size: .8rem; color: #94a3b8; font-weight: 700; margin-right: 6px; }
+.mkt { font-size: .58rem; padding: 2px 6px; border-radius: 3px; font-weight: 700; }
+.peg-badge { font-size: .62rem; padding: 2px 8px; border-radius: 4px; border: 1px solid; font-weight: 600; }
+.card-name { font-size: 1.05rem; font-weight: 700; color: #f1f5f9; }
+.peg-label { font-size: .72rem; color: #94a3b8; margin: 2px 0 10px; }
+.price-row { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.price { font-size: 1.6rem; font-weight: 700; color: #f8fafc; letter-spacing: -.02em; }
+.chg { font-size: .9rem; font-weight: 600; }
+.metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+.mbox { background: #0f172a; border: 1px solid #1e293b; border-radius: 6px; padding: 7px 9px; }
+.mlabel { display: block; font-size: .58rem; color: #475569; margin-bottom: 3px; letter-spacing: .04em; }
+.mval { font-size: .88rem; font-weight: 700; color: #cbd5e1; }
+.bar-bg { height: 6px; background: #1e293b; border-radius: 3px; position: relative; overflow: hidden; margin-bottom: 4px; }
+.bar-fill { height: 100%; border-radius: 3px; transition: width .5s; }
+.bar-mark { position: absolute; left: 25%; top: 0; bottom: 0; width: 2px; background: #64748b; opacity: .6; }
+.bar-labels { display: flex; justify-content: space-between; font-size: .6rem; }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; padding: 16px 20px 0; position: relative; z-index: 1; }
+.li { display: flex; align-items: center; gap: 5px; font-size: .68rem; color: #64748b; }
+.dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
+.disclaimer { padding: 8px 20px 0; font-size: .6rem; color: #334155; line-height: 1.8; position: relative; z-index: 1; }
+</style>
+</head>
+<body>
+<div class="grid-bg"></div>
+
+<header>
+  <div>
+    <div class="eyebrow">AI 網路搜尋　即時串接</div>
+    <h1>台灣封測族群　PEG 監控儀表板</h1>
+  </div>
+  <div class="hright">
+    <span class="upd" id="upd"></span>
+    <button class="fetch-btn" id="fetchBtn" onclick="fetchData()">🔍 抓取最新資料</button>
+  </div>
+</header>
+
+<div id="err" class="err" style="display:none"></div>
+
+<div id="intro" class="intro">
+  <p>按「<strong>🔍 抓取最新資料</strong>」，AI 將搜尋 Yahoo 股市取得最新股價與本益比</p>
+  <p style="margin-top:8px;font-size:.75rem;color:#475569">資料涵蓋：日月光(3711)、力成(6239)、京元電子(2449)、南茂(8150)、矽格(6257)、欣銓(3264)</p>
+</div>
+
+<div id="sortBar" class="sort-bar" style="display:none">
+  <span class="sort-lbl">排序：</span>
+  <button class="sbtn active" onclick="setSort('peg',this)">PEG 低→高</button>
+  <button class="sbtn" onclick="setSort('eps',this)">EPS成長 高→低</button>
+  <button class="sbtn" onclick="setSort('pe',this)">本益比 低→高</button>
+</div>
+
+<div class="cards" id="cards"></div>
+<div class="legend" id="legend" style="display:none">
+  <span class="li"><span class="dot" style="background:#34d399"></span>PEG &lt; 0.6 嚴重低估</span>
+  <span class="li"><span class="dot" style="background:#86efac"></span>0.6–1.0 偏低估</span>
+  <span class="li"><span class="dot" style="background:#fbbf24"></span>1.0–2.0 合理</span>
+  <span class="li"><span class="dot" style="background:#f87171"></span>&gt; 2.0 偏高估</span>
+</div>
+<p class="disclaimer" id="disc" style="display:none">
+  資料來源：AI 網路搜尋（Yahoo 股市 / 財報狗）· 本益比為 TTM · EPS 年增率為法人預估 · 僅供參考，不構成投資建議
+</p>
+
+<script>
+const META = {
+  "3711": { name:"日月光投控", epsGrowth:89, analyst:400,  market:"TSE" },
+  "6239": { name:"力成",       epsGrowth:47, analyst:265,  market:"TSE" },
+  "2449": { name:"京元電子",   epsGrowth:10, analyst:350,  market:"TSE" },
+  "8150": { name:"南茂",       epsGrowth:3,  analyst:null, market:"TSE" },
+  "6257": { name:"矽格",       epsGrowth:39, analyst:125,  market:"OTC" },
+  "3264": { name:"欣銓",       epsGrowth:20, analyst:null, market:"OTC" },
+};
+const ORDER = ["3711","6239","6257","3264","2449","8150"];
+let stockData = {}, sortKey = "peg";
+
+function pegColor(p){ if(!p||p<=0)return"#9ca3af"; if(p<0.6)return"#34d399"; if(p<1.0)return"#86efac"; if(p<2.0)return"#fbbf24"; return"#f87171"; }
+function pegLabel(p){ if(!p||p<=0)return"資料待取"; if(p<0.6)return"嚴重低估 🟢"; if(p<1.0)return"偏低估 🟡"; if(p<2.0)return"合理"; return"偏高估 🔴"; }
+const fmt = (v,d=2) => (v!=null&&!isNaN(v)) ? Number(v).toFixed(d) : "—";
+
+async function fetchData() {
+  const btn = document.getElementById("fetchBtn");
+  btn.disabled = true; btn.textContent = "⏳ AI 搜尋中...";
+  document.getElementById("err").style.display = "none";
+  try {
+    const prompt = `請搜尋台灣股市，以 JSON 格式回傳以下6支封測股的最新資料。只回傳純 JSON，不要 markdown，不要說明文字。
+格式：
+{"3711":{"close":數字,"change":數字,"changePct":數字,"pe":數字},"6239":{...},"2449":{...},"8150":{...},"6257":{...},"3264":{...}}
+股票：日月光投控(3711)、力成(6239)、京元電子(2449)、南茂(8150)、矽格(6257)、欣銓(3264)
+所有值填數字，不確定填 null。`;
+
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1000,
+        tools: [{ type: "web_search_20250305", name: "web_search" }],
+        messages: [{ role: "user", content: prompt }]
+      })
+    });
+    const data = await res.json();
+    const text = (data.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("");
+    const clean = text.replace(/```json|```/g,"").trim();
+    stockData = JSON.parse(clean);
+
+    document.getElementById("intro").style.display = "none";
+    document.getElementById("sortBar").style.display = "flex";
+    document.getElementById("legend").style.display = "flex";
+    document.getElementById("disc").style.display = "block";
+    document.getElementById("upd").textContent = "更新 " + new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"});
+    render();
+  } catch(e) {
+    const el = document.getElementById("err");
+    el.textContent = "取得資料失敗：" + e.message;
+    el.style.display = "block";
+  }
+  btn.disabled = false; btn.textContent = "🔍 抓取最新資料";
+}
+
+function setSort(key, btn) {
+  sortKey = key;
+  document.querySelectorAll(".sbtn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  render();
+}
+
+function render() {
+  const rows = ORDER.map(code => {
+    const m = META[code], s = stockData[code]||{};
+    const pe = s.pe, peg = pe && m.epsGrowth ? pe / m.epsGrowth : null;
+    const upside = s.close && m.analyst ? (m.analyst - s.close) / s.close * 100 : null;
+    return { code, m, s, pe, peg, upside };
+  });
+  rows.sort((a,b) => {
+    if(sortKey==="peg") return (a.peg??9999)-(b.peg??9999);
+    if(sortKey==="eps") return b.m.epsGrowth-a.m.epsGrowth;
+    if(sortKey==="pe")  return (a.pe??9999)-(b.pe??9999);
+    return 0;
+  });
+
+  document.getElementById("cards").innerHTML = rows.map(({code,m,s,pe,peg,upside}) => {
+    const pc = pegColor(peg);
+    const cc = s.change>0?"#34d399":s.change<0?"#f87171":"#9ca3af";
+    const mcBg = m.market==="TSE"?"#1e40af33":"#7e22ce33";
+    const mcFg = m.market==="TSE"?"#93c5fd":"#c4b5fd";
+    const barW = peg ? Math.min(peg/4*100,100) : 0;
+    const uc = upside>0?"#34d399":upside<0?"#f87171":"#9ca3af";
+    return `
+    <div class="card">
+      <div class="card-glow" style="background:${pc}18"></div>
+      <div class="card-top">
+        <div>
+          <span class="card-code">${code}</span>
+          <span class="mkt" style="background:${mcBg};color:${mcFg}">${m.market}</span>
+        </div>
+        <span class="peg-badge" style="color:${pc};border-color:${pc}55;background:${pc}15">
+          ${peg ? "PEG "+peg.toFixed(2) : "PEG —"}
+        </span>
+      </div>
+      <div class="card-name">${m.name}</div>
+      <div class="peg-label">${pegLabel(peg)}</div>
+      <div class="price-row">
+        <span class="price">${s.close!=null?"$"+fmt(s.close):"—"}</span>
+        <span class="chg" style="color:${cc}">
+          ${s.change!=null?(s.change>0?"▲":s.change<0?"▼":"")+fmt(Math.abs(s.change))+" ("+fmt(Math.abs(s.changePct))+"%)":""}
+        </span>
+      </div>
+      <div class="metrics">
+        <div class="mbox"><span class="mlabel">本益比 (TTM)</span><span class="mval">${pe!=null?fmt(pe,1)+"x":"—"}</span></div>
+        <div class="mbox"><span class="mlabel">EPS 年增率 (法預)</span><span class="mval" style="color:#34d399">${m.epsGrowth}%</span></div>
+        <div class="mbox"><span class="mlabel">法人目標價</span><span class="mval">${m.analyst?"$"+m.analyst:"—"}</span></div>
+        <div class="mbox"><span class="mlabel">目標上行空間</span><span class="mval" style="color:${uc}">${upside!=null?(upside>0?"+":"")+fmt(upside)+"%":"—"}</span></div>
+      </div>
+      <div class="bar-bg">
+        <div class="bar-fill" style="width:${barW}%;background:linear-gradient(90deg,${pc}66,${pc})"></div>
+        <div class="bar-mark"></div>
+      </div>
+      <div class="bar-labels">
+        <span style="color:#34d399">低估 ◀</span>
+        <span style="color:#9ca3af">PEG = 1</span>
+        <span style="color:#f87171">▶ 高估</span>
+      </div>
+    </div>`;
+  }).join("");
+}
+</script>
+</body>
+</html>
