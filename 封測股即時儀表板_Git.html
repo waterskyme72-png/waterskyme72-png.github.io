@@ -3,305 +3,280 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>封測股即時儀表板 GitHub版</title>
+<title>台灣封測股即時儀表板</title>
 
 <style>
-body{
-  margin:0;
-  background:#08111f;
-  color:#e5e7eb;
-  font-family:Arial,sans-serif;
-}
-header{
-  padding:20px;
-  border-bottom:1px solid #1f2937;
-}
-h1{
-  margin:0;
-}
-.sub{
-  color:#38bdf8;
-  margin-top:8px;
-}
-button{
-  margin-top:12px;
-  background:#1e293b;
-  color:white;
-  border:none;
-  border-radius:8px;
-  padding:8px 14px;
-  cursor:pointer;
-}
-.cards{
-  display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(300px,1fr));
-  gap:16px;
-  padding:20px;
-}
-.card{
-  background:#111827;
-  border:1px solid #374151;
-  border-radius:14px;
-  padding:18px;
-}
-.code{
-  color:#94a3b8;
-  font-size:.85rem;
-}
-.name{
-  font-size:1.2rem;
-  font-weight:bold;
-  margin-top:4px;
-}
-.price{
-  font-size:2rem;
-  font-weight:bold;
-  margin-top:14px;
-}
-.up{color:#34d399}
-.down{color:#f87171}
-.flat{color:#cbd5e1}
+  :root {
+    --bg-color: #0f172a;
+    --card-bg: #1e293b;
+    --text-main: #f8fafc;
+    --text-dim: #94a3b8;
+    --up-color: #f87171; /* 台灣習慣：紅漲 */
+    --down-color: #34d399; /* 台灣習慣：綠跌 */
+    --accent: #38bdf8;
+  }
 
-.grid{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:10px;
-  margin-top:16px;
-}
+  body {
+    margin: 0;
+    background: var(--bg-color);
+    color: var(--text-main);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
 
-.box{
-  background:#0f172a;
-  border-radius:8px;
-  padding:10px;
-}
+  header {
+    padding: 24px;
+    background: #111827;
+    border-bottom: 1px solid #334155;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 15px;
+  }
 
-.label{
-  color:#94a3b8;
-  font-size:.75rem;
-}
+  h1 { margin: 0; font-size: 1.5rem; }
+  
+  .controls { display: flex; align-items: center; gap: 15px; }
 
-.val{
-  margin-top:4px;
-  font-weight:bold;
-}
+  #time { color: var(--text-dim); font-size: 0.9rem; }
 
-.loading{
-  text-align:center;
-  padding:40px;
-}
+  button {
+    background: var(--accent);
+    color: #000;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  button:hover { opacity: 0.8; }
 
-#error{
-  margin:20px;
-  background:#450a0a;
-  color:#fecaca;
-  padding:14px;
-  border-radius:10px;
-  display:none;
-}
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 20px;
+    padding: 20px;
+  }
 
-footer{
-  padding:20px;
-  color:#64748b;
-}
+  .card {
+    background: var(--card-bg);
+    border: 1px solid #334155;
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  }
+
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+
+  .code { color: var(--text-dim); font-size: 0.85rem; font-family: monospace; }
+  .name { font-size: 1.25rem; font-weight: bold; margin-top: 4px; }
+
+  .price-section { margin-top: 20px; }
+  .price { font-size: 2.5rem; font-weight: 800; line-height: 1; }
+  
+  .change {
+    margin-top: 8px;
+    font-weight: 600;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 24px;
+  }
+
+  .box {
+    background: rgba(15, 23, 42, 0.5);
+    border-radius: 10px;
+    padding: 12px;
+  }
+
+  .label { color: var(--text-dim); font-size: 0.75rem; margin-bottom: 4px; }
+  .val { font-weight: bold; font-size: 1rem; }
+
+  .up { color: var(--up-color); }
+  .down { color: var(--down-color); }
+  .flat { color: var(--text-dim); }
+
+  #error {
+    margin: 20px;
+    background: #450a0a;
+    color: #fecaca;
+    padding: 16px;
+    border-radius: 8px;
+    display: none;
+    border: 1px solid #991b1b;
+  }
+
+  .loading-spinner {
+    text-align: center;
+    padding: 50px;
+    color: var(--text-dim);
+  }
+
+  footer {
+    padding: 40px 20px;
+    color: var(--text-dim);
+    font-size: 0.8rem;
+    text-align: center;
+    line-height: 1.6;
+  }
 </style>
 </head>
-
 <body>
 
 <header>
-  <h1>台灣封測股 即時儀表板</h1>
-
-  <div class="sub">
-    GitHub Pages 可用版本（CORS Proxy）
+  <div>
+    <h1>台灣封測股 即時儀表板</h1>
+    <div id="time">正在初始化...</div>
   </div>
-
-  <button onclick="fetchData()">
-    重新整理
-  </button>
-
-  <div id="time" style="margin-top:10px;color:#94a3b8"></div>
+  <div class="controls">
+    <button onclick="fetchData()">手動更新</button>
+  </div>
 </header>
 
 <div id="error"></div>
 
-<div id="loading" class="loading">
-  正在讀取資料...
+<div id="loading" class="loading-spinner">
+  資料連線中，請稍候...
 </div>
 
 <div id="cards" class="cards"></div>
 
 <footer>
-資料來源：TWSE OpenAPI + allorigins proxy<br>
-每60秒自動更新
+  數據來源：臺灣證券交易所 (TWSE) Open Data<br>
+  透過 corsproxy.io 進行跨網域存取 | 自動更新頻率：60秒
 </footer>
 
 <script>
-
-const STOCKS = {
-  '3711': {name:'日月光投控', epsGrowth:89, analyst:400},
-  '6239': {name:'力成', epsGrowth:47, analyst:265},
-  '2449': {name:'京元電子', epsGrowth:10, analyst:350},
-  '8150': {name:'南茂', epsGrowth:3, analyst:null},
+// 股票清單與自定義數據
+const STOCKS_CONFIG = {
+  '3711': { name: '日月光投控', epsGrowth: 89, analyst: 400 },
+  '6239': { name: '力成', epsGrowth: 47, analyst: 265 },
+  '2449': { name: '京元電子', epsGrowth: 10, analyst: 350 },
+  '8150': { name: '南茂', epsGrowth: 3, analyst: null }
 };
 
-function num(v){
-  if(v===null || v===undefined) return null;
-  const n = parseFloat(String(v).replace(/,/g,''));
+// 格式化數字
+function num(v) {
+  if (v === null || v === undefined) return null;
+  const n = parseFloat(String(v).replace(/,/g, ''));
   return isNaN(n) ? null : n;
 }
 
-function fmt(v,d=2){
-  if(v===null || v===undefined || isNaN(v)) return '—';
+function fmt(v, d = 2) {
+  if (v === null || v === undefined || isNaN(v)) return '—';
   return Number(v).toFixed(d);
 }
 
-async function fetchData(){
+async function fetchData() {
+  const errorEl = document.getElementById('error');
+  const loadingEl = document.getElementById('loading');
+  const cardsEl = document.getElementById('cards');
 
-  document.getElementById('error').style.display='none';
+  errorEl.style.display = 'none';
+  // 如果已經有資料，更新時不顯示全螢幕 loading 增加體驗
+  if (cardsEl.innerHTML === '') loadingEl.style.display = 'block';
 
-  try{
-
-    // 使用 allorigins 解決 GitHub.io CORS
-    const target =
-      encodeURIComponent(
-        'https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL'
-      );
-
-    const url =
-      'https://api.allorigins.win/raw?url=' + target;
+  try {
+    // 使用 corsproxy.io 解決 GitHub Pages 的 CORS 問題
+    const target = 'https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL';
+    const url = `https://corsproxy.io/?${encodeURIComponent(target)}`;
 
     const res = await fetch(url);
-
-    if(!res.ok){
-      throw new Error('Proxy API 無法連線');
-    }
+    if (!res.ok) throw new Error(`API 連線失敗 (HTTP ${res.status})`);
 
     const data = await res.json();
+    if (!Array.isArray(data)) throw new Error('回傳格式異常');
 
     render(data);
 
-    document.getElementById('time').innerHTML =
-      '最後更新：' +
-      new Date().toLocaleTimeString('zh-TW');
+    document.getElementById('time').innerHTML = 
+      `最後更新：${new Date().toLocaleTimeString('zh-TW', { hour12: false })}`;
 
-  }catch(err){
-
-    const el = document.getElementById('error');
-
-    el.style.display='block';
-
-    el.innerHTML =
-      'API 讀取失敗：' + err.message;
-
+  } catch (err) {
+    console.error(err);
+    errorEl.style.display = 'block';
+    errorEl.innerHTML = `⚠️ 讀取失敗：${err.message}。請確認網路連線或稍後再試。`;
+  } finally {
+    loadingEl.style.display = 'none';
   }
-
-  document.getElementById('loading').style.display='none';
-
 }
 
-function render(data){
+function render(data) {
+  const filteredData = data
+    .filter(item => STOCKS_CONFIG[item.Code])
+    .map(item => ({
+      code: item.Code,
+      ...STOCKS_CONFIG[item.Code],
+      price: num(item.ClosingPrice),
+      open: num(item.OpeningPrice),
+      high: num(item.HighestPrice),
+      low: num(item.LowestPrice),
+      change: num(item.Change),
+      volume: num(item.TradeVolume)
+    }));
 
-  const rows = [];
-
-  data.forEach(item=>{
-
-    const code = item.Code;
-
-    if(!STOCKS[code]) return;
-
-    const meta = STOCKS[code];
-
-    rows.push({
-      code,
-      name:meta.name,
-      epsGrowth:meta.epsGrowth,
-      analyst:meta.analyst,
-      price:num(item.ClosingPrice),
-      open:num(item.OpeningPrice),
-      high:num(item.HighestPrice),
-      low:num(item.LowestPrice),
-      change:num(item.Change),
-      volume:num(item.TradeVolume)
-    });
-
-  });
-
-  const cards = document.getElementById('cards');
-
-  cards.innerHTML = rows.map(r=>{
-
-    const cls =
-      r.change > 0 ? 'up' :
-      r.change < 0 ? 'down' :
-      'flat';
+  const cardsContainer = document.getElementById('cards');
+  cardsContainer.innerHTML = filteredData.map(r => {
+    // 判斷顏色類別
+    const colorClass = r.change > 0 ? 'up' : r.change < 0 ? 'down' : 'flat';
+    const arrow = r.change > 0 ? '▲' : r.change < 0 ? '▼' : '';
 
     return `
       <div class="card">
-
-        <div class="code">${r.code}</div>
-
-        <div class="name">
-          ${r.name}
+        <div class="card-header">
+          <div>
+            <div class="code">${r.code}</div>
+            <div class="name">${r.name}</div>
+          </div>
         </div>
 
-        <div class="price">
-          $${fmt(r.price)}
-        </div>
-
-        <div class="${cls}">
-          ${r.change>0?'▲':''}
-          ${fmt(r.change)}
+        <div class="price-section">
+          <div class="price ${colorClass}">$${fmt(r.price)}</div>
+          <div class="change ${colorClass}">
+            ${arrow} ${fmt(Math.abs(r.change))} (${r.price && r.change ? fmt((r.change/(r.price-r.change))*100) : 0}%)
+          </div>
         </div>
 
         <div class="grid">
-
           <div class="box">
-            <div class="label">開盤</div>
-            <div class="val">${fmt(r.open)}</div>
+            <div class="label">最高 / 最低</div>
+            <div class="val">${fmt(r.high)} / ${fmt(r.low)}</div>
           </div>
-
           <div class="box">
-            <div class="label">最高</div>
-            <div class="val">${fmt(r.high)}</div>
+            <div class="label">成交張數</div>
+            <div class="val">${r.volume ? Math.floor(r.volume/1000).toLocaleString() : '—'}</div>
           </div>
-
-          <div class="box">
-            <div class="label">最低</div>
-            <div class="val">${fmt(r.low)}</div>
-          </div>
-
-          <div class="box">
-            <div class="label">成交量</div>
-            <div class="val">
-              ${r.volume ? Number(r.volume).toLocaleString() : '—'}
-            </div>
-          </div>
-
           <div class="box">
             <div class="label">EPS 年增率</div>
-            <div class="val">${r.epsGrowth}%</div>
+            <div class="val" style="color: #fbbf24">${r.epsGrowth}%</div>
           </div>
-
           <div class="box">
-            <div class="label">法人目標價</div>
-            <div class="val">
-              ${r.analyst ? '$'+r.analyst : '—'}
-            </div>
+            <div class="label">法人目標</div>
+            <div class="val">${r.analyst ? '$'+r.analyst : '—'}</div>
           </div>
-
         </div>
-
       </div>
     `;
-
   }).join('');
-
 }
 
+// 啟動
 fetchData();
 
-setInterval(fetchData,60000);
-
+// 每 60 秒自動重新抓取
+setInterval(fetchData, 60000);
 </script>
 
 </body>
