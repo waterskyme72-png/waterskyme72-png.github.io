@@ -1,227 +1,640 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>台股 200 強價值監控系統</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>台股價值監控系統</title>
+
 <style>
-  :root {
-    --bg-color: #0d1117;
-    --card-bg: #161b22;
-    --card-border: #30363d;
-    --text-main: #c9d1d9;
-    --text-dim: #8b949e;
-    --up-color: #f85149; 
-    --down-color: #3fb950;
-    --accent: #58a6ff;
-  }
+:root{
+  --bg:#0d1117;
+  --card:#161b22;
+  --border:#30363d;
+  --text:#c9d1d9;
+  --dim:#8b949e;
+  --up:#f85149;
+  --down:#3fb950;
+  --accent:#58a6ff;
+}
 
-  body { margin: 0; background: var(--bg-color); color: var(--text-main); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-  header { padding: 15px 24px; background: #010409; border-bottom: 1px solid var(--card-border); position: sticky; top: 0; z-index: 100; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; }
-  .logo-area h1 { margin: 0; font-size: 1.2rem; color: var(--accent); }
-  
-  .search-box { background: #0d1117; border: 1px solid var(--card-border); border-radius: 6px; padding: 6px 12px; color: white; width: 250px; outline: none; }
-  .controls { display: flex; align-items: center; gap: 15px; font-size: 0.85rem; }
-  button.refresh { background: #238636; color: white; border: 1px solid rgba(240,246,252,0.1); border-radius: 6px; padding: 6px 16px; cursor: pointer; font-weight: 600; }
+*{
+  box-sizing:border-box;
+}
 
-  .sort-bar { padding: 10px 24px; background: #0d1117; border-bottom: 1px solid var(--card-border); display: flex; gap: 8px; overflow-x: auto; align-items: center; }
-  .sbtn { background: #21262d; border: 1px solid var(--card-border); color: var(--text-main); padding: 5px 14px; border-radius: 6px; font-size: 0.75rem; cursor: pointer; white-space: nowrap; }
-  .sbtn.active { background: #388bfd; border-color: #388bfd; color: white; font-weight: bold; }
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
 
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; padding: 20px; }
-  .card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 18px; transition: 0.2s; display: flex; flex-direction: column; }
-  .card:hover { border-color: #8b949e; transform: translateY(-2px); }
-  
-  /* 修正重疊問題的關鍵 CSS */
-  .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; min-height: 44px; }
-  .title-group { flex: 1; margin-right: 10px; } /* 給予右側標籤固定間距 */
-  .code { font-family: monospace; color: var(--text-dim); font-size: 0.8rem; display: block; }
-  .name { font-size: 1.15rem; font-weight: 800; color: #fff; display: block; margin-top: 2px; }
-  
-  .peg-label { padding: 4px 10px; border-radius: 6px; font-size: 0.7rem; font-weight: bold; white-space: nowrap; text-align: center; }
+header{
+  padding:16px 24px;
+  background:#010409;
+  border-bottom:1px solid var(--border);
+  position:sticky;
+  top:0;
+  z-index:100;
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:space-between;
+  align-items:center;
+  gap:16px;
+}
 
-  .price-row { display: flex; align-items: baseline; gap: 10px; margin-bottom: 15px; }
-  .price { font-size: 2rem; font-weight: 800; }
-  .change { font-size: 1rem; font-weight: 600; }
-  
-  .value-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: auto; padding-top: 12px; border-top: 1px solid #30363d88; }
-  .v-box { background: #0d1117; padding: 10px; border-radius: 6px; }
-  .v-lbl { font-size: 0.65rem; color: var(--text-dim); display: block; margin-bottom: 3px; }
-  .v-val { font-size: 0.95rem; font-weight: 700; color: var(--text-main); }
-  .v-val.grow { color: #fbbf24; }
+.logo h1{
+  margin:0;
+  color:var(--accent);
+  font-size:1.2rem;
+}
 
-  .up { color: var(--up-color); }
-  .down { color: var(--down-color); }
-  #loading { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(13,17,23,0.85); display: flex; justify-content: center; align-items: center; z-index: 999; display: none; }
+.logo small{
+  color:var(--dim);
+}
+
+.search-box{
+  background:#0d1117;
+  border:1px solid var(--border);
+  border-radius:6px;
+  padding:8px 12px;
+  color:white;
+  width:260px;
+  outline:none;
+}
+
+.controls{
+  display:flex;
+  gap:12px;
+  align-items:center;
+}
+
+button{
+  background:#238636;
+  border:none;
+  color:white;
+  padding:8px 16px;
+  border-radius:6px;
+  cursor:pointer;
+  font-weight:bold;
+}
+
+button:hover{
+  opacity:.9;
+}
+
+.sort-bar{
+  display:flex;
+  gap:8px;
+  overflow:auto;
+  padding:12px 24px;
+  border-bottom:1px solid var(--border);
+}
+
+.sbtn{
+  background:#21262d;
+  border:1px solid var(--border);
+}
+
+.sbtn.active{
+  background:#388bfd;
+}
+
+.grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(320px,1fr));
+  gap:16px;
+  padding:20px;
+}
+
+.card{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:18px;
+  transition:.2s;
+}
+
+.card:hover{
+  transform:translateY(-2px);
+  border-color:#8b949e;
+}
+
+.card-header{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:10px;
+  margin-bottom:12px;
+}
+
+.title-group{
+  flex:1;
+}
+
+.code{
+  font-family:monospace;
+  color:var(--dim);
+  font-size:.8rem;
+}
+
+.name{
+  font-size:1.1rem;
+  font-weight:800;
+  color:white;
+  margin-top:2px;
+}
+
+.peg-label{
+  padding:4px 10px;
+  border-radius:6px;
+  font-size:.7rem;
+  font-weight:bold;
+  white-space:nowrap;
+  text-align:center;
+}
+
+.price-row{
+  display:flex;
+  align-items:baseline;
+  gap:10px;
+  margin-bottom:14px;
+}
+
+.price{
+  font-size:2rem;
+  font-weight:800;
+}
+
+.change{
+  font-size:1rem;
+  font-weight:600;
+}
+
+.up{
+  color:var(--up);
+}
+
+.down{
+  color:var(--down);
+}
+
+.value-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  margin-top:12px;
+}
+
+.v-box{
+  background:#0d1117;
+  padding:10px;
+  border-radius:6px;
+}
+
+.v-lbl{
+  display:block;
+  font-size:.65rem;
+  color:var(--dim);
+  margin-bottom:4px;
+}
+
+.v-val{
+  font-size:.95rem;
+  font-weight:700;
+}
+
+.grow{
+  color:#fbbf24;
+}
+
+#loading{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,.7);
+  display:none;
+  justify-content:center;
+  align-items:center;
+  z-index:999;
+  font-size:1.2rem;
+}
 </style>
 </head>
+
 <body>
 
 <div id="loading">📡 數據同步中...</div>
 
 <header>
-  <div class="logo-area">
-    <h1>台股 200 強價值監控</h1>
-    <div style="font-size: 0.7rem; color: var(--text-dim);">整合法人 2026 EPS 預估與重電族群</div>
+
+  <div class="logo">
+    <h1>台股價值監控系統</h1>
+    <small>FinMind API 全自動版</small>
   </div>
-  <input type="text" id="searchInput" class="search-box" placeholder="搜尋代碼或名稱..." oninput="render()">
+
+  <input
+    type="text"
+    id="searchInput"
+    class="search-box"
+    placeholder="搜尋股票..."
+    oninput="render()"
+  >
+
   <div class="controls">
     <span id="updateTime">尚未同步</span>
-    <button class="refresh" id="refreshBtn" onclick="fetchAllData()">刷新報價</button>
+    <button onclick="fetchAllData()">刷新</button>
   </div>
+
 </header>
 
 <div class="sort-bar">
-  <button class="sbtn active" data-sort="price" onclick="setSort('price', this)">股價排序</button>
-  <button class="sbtn" data-sort="peg" onclick="setSort('peg', this)">PEG 價值排序</button>
-  <button class="sbtn" data-sort="growth" onclick="setSort('growth', this)">EPS 成長率排序</button>
-  <button class="sbtn" data-sort="change" onclick="setSort('change', this)">漲跌幅</button>
+
+  <button class="sbtn active" onclick="setSort('price', this)">
+    股價排序
+  </button>
+
+  <button class="sbtn" onclick="setSort('peg', this)">
+    PEG 排序
+  </button>
+
+  <button class="sbtn" onclick="setSort('growth', this)">
+    成長率排序
+  </button>
+
+  <button class="sbtn" onclick="setSort('change', this)">
+    漲跌排序
+  </button>
+
 </div>
 
-<div id="mainGrid" class="grid"></div>
+<div class="grid" id="mainGrid"></div>
 
 <script>
-// 數據字典：包含重電族群最新預估
-const DATA_STORE = {
-  "1514": { name: "亞力",   eps: 3.72, growth: 21.5 },
-  "1503": { name: "士電",   eps: 9.0,  growth: 8.0 },
-  "1513": { name: "中興電", eps: 8.8,  growth: 12.0 },
-  "1519": { name: "華城",   eps: 20.9, growth: 30.0 },
-  "2330": { name: "台積電", eps: 72.5, growth: 22.0 },
-  "2454": { name: "聯發科", eps: 82.0, growth: 18.0 },
-  "2317": { name: "鴻海",   eps: 16.8, growth: 22.0 },
-  "2382": { name: "廣達",   eps: 19.5, growth: 28.0 },
-  "6669": { name: "緯穎",   eps: 145.0, growth: 35.0 },
-  "3017": { name: "奇鋐",   eps: 38.5, growth: 32.0 },
-  "2308": { name: "台達電", eps: 18.5, growth: 15.0 },
-  "3711": { name: "日月光投控", eps: 15.7, growth: 30.0 },
-  "2331": { name: "精英",   eps: 2.5,  growth: 15.0 },
-  "2881": { name: "富邦金", eps: 8.2,  growth: 8.0 },
-  "2603": { name: "長榮",   eps: 18.0, growth: 5.0 }
+
+// ===== 股票池 =====
+
+const STOCK_POOL = [
+  "2330",
+  "2454",
+  "2317",
+  "2382",
+  "6669",
+  "3017",
+  "2308",
+  "1519",
+  "1513",
+  "1503",
+  "1514",
+  "2603",
+  "2881"
+];
+
+// ===== 成長率預估 =====
+// 未來成長率通常沒有公開 API
+// 建議自己維護
+
+const GROWTH_EST = {
+  "2330": 22,
+  "2454": 18,
+  "2317": 22,
+  "2382": 28,
+  "6669": 35,
+  "3017": 32,
+  "2308": 15,
+  "1519": 30,
+  "1513": 12,
+  "1503": 8,
+  "1514": 21,
+  "2603": 5,
+  "2881": 8
 };
 
 let currentMarket = [];
-let sortKey = 'price';
+let sortKey = "price";
 
-async function fetchAllData() {
-  const overlay = document.getElementById('loading');
-  const btn = document.getElementById('refreshBtn');
-  overlay.style.display = 'flex';
-  btn.disabled = true;
+// ===== 排序 =====
 
-  const targetUrl = 'https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL';
-  const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
+function setSort(key, btn){
 
-  try {
-    const response = await fetch(proxyUrl);
-    const data = await response.json();
-    
-    currentMarket = data.map(item => {
-      const code = item.Code;
-      const conf = DATA_STORE[code] || { eps: 0, growth: 0 };
-      const price = parseFloat(item.ClosingPrice.replace(/,/g, ''));
-      const change = parseFloat(item.Change.replace(/,/g, ''));
-      
-      const pe = (conf.eps > 0 && price > 0) ? (price / conf.eps) : null;
-      const peg = (pe && conf.growth > 0) ? (pe / conf.growth) : null;
-
-      return {
-        code,
-        name: DATA_STORE[code] ? DATA_STORE[code].name : item.Name,
-        price,
-        change,
-        pct: (change / (price - change) * 100).toFixed(2),
-        eps: conf.eps,
-        growth: conf.growth,
-        pe,
-        peg
-      };
-    }).filter(s => s.price > 50 || DATA_STORE[s.code]); // 篩選中高價或有名單的
-
-    document.getElementById('updateTime').textContent = '更新：' + new Date().toLocaleTimeString();
-    render();
-  } catch (e) {
-    alert("數據抓取失敗，可能是代理伺服器忙碌，請稍後再試。");
-  } finally {
-    overlay.style.display = 'none';
-    btn.disabled = false;
-  }
-}
-
-function setSort(key, btn) {
   sortKey = key;
-  document.querySelectorAll('.sbtn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
+
+  document.querySelectorAll(".sbtn")
+    .forEach(b => b.classList.remove("active"));
+
+  btn.classList.add("active");
+
   render();
 }
 
-function render() {
-  const grid = document.getElementById('mainGrid');
-  const query = document.getElementById('searchInput').value.toLowerCase();
-  
-  let filtered = currentMarket.filter(s => s.code.includes(query) || s.name.includes(query));
+// ===== 抓單一股票 =====
 
-  filtered.sort((a, b) => {
-    if (sortKey === 'price') return b.price - a.price;
-    if (sortKey === 'change') return b.change - a.change;
-    if (sortKey === 'growth') return b.growth - a.growth;
-    if (sortKey === 'peg') {
-      const valA = a.peg === null ? 999 : a.peg;
-      const valB = b.peg === null ? 999 : b.peg;
-      return valA - valB;
+async function fetchStock(code){
+
+  try{
+
+    // 股價
+    const priceUrl =
+      `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPrice&data_id=${code}&start_date=2026-01-01`;
+
+    // PER
+    const perUrl =
+      `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPER&data_id=${code}&start_date=2026-01-01`;
+
+    const [priceRes, perRes] = await Promise.all([
+      fetch(priceUrl),
+      fetch(perUrl)
+    ]);
+
+    const priceJson = await priceRes.json();
+    const perJson = await perRes.json();
+
+    if(!priceJson.data?.length){
+      return null;
     }
+
+    const latestPrice =
+      priceJson.data[priceJson.data.length - 1];
+
+    const latestPer =
+      perJson.data?.length
+        ? perJson.data[perJson.data.length - 1]
+        : null;
+
+    const price = latestPrice.close;
+
+    const change =
+      latestPrice.max - latestPrice.min;
+
+    const pct =
+      ((change / (price - change)) * 100).toFixed(2);
+
+    const per =
+      latestPer?.PER || null;
+
+    const eps =
+      per ? (price / per).toFixed(2) : null;
+
+    const growth =
+      GROWTH_EST[code] || 0;
+
+    const peg =
+      (per && growth)
+        ? (per / growth)
+        : null;
+
+    return {
+
+      code,
+
+      name:
+        latestPrice.stock_name,
+
+      price,
+
+      change,
+
+      pct,
+
+      per,
+
+      eps,
+
+      growth,
+
+      peg
+    };
+
+  }catch(err){
+
+    console.error(code, err);
+
+    return null;
+  }
+}
+
+// ===== 抓全部 =====
+
+async function fetchAllData(){
+
+  const loading =
+    document.getElementById("loading");
+
+  loading.style.display = "flex";
+
+  try{
+
+    const results =
+      await Promise.all(
+        STOCK_POOL.map(fetchStock)
+      );
+
+    currentMarket =
+      results.filter(Boolean);
+
+    document.getElementById("updateTime")
+      .textContent =
+      "更新：" +
+      new Date().toLocaleTimeString();
+
+    render();
+
+  }catch(err){
+
+    console.error(err);
+
+    alert("讀取失敗");
+
+  }finally{
+
+    loading.style.display = "none";
+  }
+}
+
+// ===== render =====
+
+function render(){
+
+  const grid =
+    document.getElementById("mainGrid");
+
+  const query =
+    document.getElementById("searchInput")
+      .value
+      .toLowerCase();
+
+  let filtered =
+    currentMarket.filter(s =>
+      s.code.includes(query) ||
+      s.name.includes(query)
+    );
+
+  filtered.sort((a,b)=>{
+
+    if(sortKey === "price"){
+      return b.price - a.price;
+    }
+
+    if(sortKey === "change"){
+      return b.change - a.change;
+    }
+
+    if(sortKey === "growth"){
+      return b.growth - a.growth;
+    }
+
+    if(sortKey === "peg"){
+
+      const A =
+        a.peg ?? 999;
+
+      const B =
+        b.peg ?? 999;
+
+      return A - B;
+    }
+
     return 0;
   });
 
-  grid.innerHTML = filtered.map(s => {
-    const isUp = s.change > 0;
-    const colorClass = isUp ? 'up' : (s.change < 0 ? 'down' : '');
-    const pegColor = s.peg ? (s.peg < 1 ? '#34d399' : (s.peg > 1.5 ? '#f87171' : '#fbbf24')) : 'transparent';
-    const pegText = s.peg ? (s.peg < 1 ? '被低估' : (s.peg > 1.5 ? '溢價' : '合理')) : '無數據';
-    
-    return `
+  grid.innerHTML =
+    filtered.map(s=>{
+
+      const isUp =
+        s.change > 0;
+
+      const colorClass =
+        isUp ? "up"
+          : s.change < 0
+            ? "down"
+            : "";
+
+      let pegColor = "#999";
+      let pegText = "無數據";
+
+      if(s.peg){
+
+        if(s.peg < 1){
+          pegColor = "#34d399";
+          pegText = "低估";
+        }
+        else if(s.peg > 1.5){
+          pegColor = "#f87171";
+          pegText = "偏貴";
+        }
+        else{
+          pegColor = "#fbbf24";
+          pegText = "合理";
+        }
+      }
+
+      return `
+
       <div class="card">
+
         <div class="card-header">
+
           <div class="title-group">
-            <span class="code">${s.code}</span>
-            <span class="name">${s.name}</span>
+            <div class="code">${s.code}</div>
+            <div class="name">${s.name}</div>
           </div>
-          ${s.peg ? `
-            <div class="peg-label" style="background:${pegColor}22; color:${pegColor}; border:1px solid ${pegColor}55;">
-              PEG: ${s.peg.toFixed(2)}<br><span style="font-size:0.6rem">${pegText}</span>
+
+          ${
+            s.peg
+            ?
+            `
+            <div
+              class="peg-label"
+              style="
+                background:${pegColor}22;
+                color:${pegColor};
+                border:1px solid ${pegColor}55;
+              "
+            >
+              PEG ${s.peg.toFixed(2)}
+              <br>
+              <span style="font-size:.6rem">
+                ${pegText}
+              </span>
             </div>
-          ` : ''}
+            `
+            :
+            ""
+          }
+
         </div>
 
         <div class="price-row">
-          <span class="price ${colorClass}">${s.price || '--'}</span>
-          <span class="change ${colorClass}">${isUp ? '▲' : '▼'}${Math.abs(s.change)} (${s.pct}%)</span>
+
+          <div class="price ${colorClass}">
+            ${s.price}
+          </div>
+
+          <div class="change ${colorClass}">
+            ${isUp ? "▲" : "▼"}
+            ${Math.abs(s.change).toFixed(2)}
+            (${s.pct}%)
+          </div>
+
         </div>
-        
+
         <div class="value-grid">
+
           <div class="v-box">
-            <span class="v-lbl">2026 預期成長</span>
-            <span class="v-val grow">${s.growth ? s.growth + '%' : '待評估'}</span>
+            <span class="v-lbl">
+              成長率預估
+            </span>
+
+            <span class="v-val grow">
+              ${s.growth || "--"}%
+            </span>
           </div>
+
           <div class="v-box">
-            <span class="v-lbl">預估 PE</span>
-            <span class="v-val">${s.pe ? s.pe.toFixed(1) + 'x' : '--'}</span>
+            <span class="v-lbl">
+              本益比 PER
+            </span>
+
+            <span class="v-val">
+              ${s.per ? s.per.toFixed(2) : "--"}
+            </span>
           </div>
+
           <div class="v-box">
-            <span class="v-lbl">2026 預估 EPS</span>
-            <span class="v-val">${s.eps ? '$' + s.eps : '--'}</span>
+            <span class="v-lbl">
+              推估 EPS
+            </span>
+
+            <span class="v-val">
+              ${s.eps || "--"}
+            </span>
           </div>
+
           <div class="v-box">
-            <span class="v-lbl">成交量狀態</span>
-            <span class="v-val" style="font-size:0.8rem">同步監控中</span>
+            <span class="v-lbl">
+              PEG
+            </span>
+
+            <span class="v-val">
+              ${s.peg ? s.peg.toFixed(2) : "--"}
+            </span>
           </div>
+
         </div>
+
       </div>
-    `;
-  }).join('');
+
+      `;
+    }).join("");
 }
 
+// ===== 初始載入 =====
+
 fetchAllData();
+
+// ===== 每 5 分鐘更新 =====
+
+setInterval(fetchAllData, 300000);
+
 </script>
+
 </body>
 </html>
