@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>台灣封測族群儀表板</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #080d14;
+    color: #e2e8f0;
+    font-family: 'Courier New', monospace;
+    min-height: 100vh;
+  }
+  .grid-bg {
+    position: fixed; inset: 0; pointer-events: none;
+    background-image:
+      linear-gradient(rgba(56,189,248,.04) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(56,189,248,.04) 1px,transparent 1px);
+    background-size: 40px 40px;
+  }
+  header {
+    display: flex; justify-content: space-between; align-items: flex-end;
+    padding: 20px 20px 14px;
+    border-bottom: 1px solid #1e293b;
+    background: linear-gradient(180deg,#0f172a 0%,transparent 100%);
+    position: relative; z-index: 1; flex-wrap: wrap; gap: 10px;
+  }
+  .eyebrow { font-size: .6rem; color: #38bdf8; letter-spacing: .15em; text-transform: uppercase; margin-bottom: 4px; }
+  h1 { font-size: 1.2rem; font-weight: 700; color: #f1f5f9; letter-spacing: .05em; }
+  .header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .update-time { font-size: .7rem; color: #64748b; }
+  .refresh-btn {
+    background: #1e293b; border: 1px solid #334155; color: #94a3b8;
+    padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: .75rem;
+  }
+  .refresh-btn:active { opacity: .7; }
+  .sort-bar {
+    display: flex; align-items: center; gap: 8px; padding: 12px 20px 0;
+    position: relative; z-index: 1; flex-wrap: wrap;
+  }
+  .sort-label { font-size: .7rem; color: #64748b; }
+  .sort-btn {
+    background: transparent; border: 1px solid #1e293b; color: #64748b;
+    padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: .68rem;
+  }
+  .sort-btn.active { background: #1e293b; border-color: #38bdf8; color: #38bdf8; }
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px; padding: 16px 20px 0;
+    position: relative; z-index: 1;
+  }
+  @media(max-width:480px){ .cards { grid-template-columns: 1fr; } }
+  .card {
+    background: #0d1727; border: 1px solid #1e293b;
+    border-radius: 12px; padding: 18px; position: relative; overflow: hidden;
+  }
+  .card-glow { position: absolute; inset: 0; border-radius: 12px; pointer-events: none; }
+  .card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+  .card-code { font-size: .8rem; color: #94a3b8; font-weight: 700; margin-right: 6px; }
+  .market-badge { font-size: .58rem; padding: 2px 6px; border-radius: 3px; font-weight: 700; letter-spacing: .06em; }
+  .peg-badge { font-size: .62rem; padding: 3px 8px; border-radius: 4px; border: 1px solid; font-weight: 600; }
+  .card-name { font-size: 1.1rem; font-weight: 700; color: #f1f5f9; margin-bottom: 10px; letter-spacing: .04em; }
+  .price-row { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+  .price { font-size: 1.65rem; font-weight: 700; color: #f8fafc; letter-spacing: -.02em; }
+  .chg { font-size: .95rem; font-weight: 600; }
+  .ohlv { display: flex; border-top: 1px solid #1e293b; border-bottom: 1px solid #1e293b; margin-bottom: 12px; padding: 8px 0; }
+  .ohlv-item { flex: 1; display: flex; flex-direction: column; align-items: center; }
+  .ohlv-label { font-size: .58rem; color: #475569; margin-bottom: 2px; }
+  .ohlv-val { font-size: .78rem; color: #94a3b8; font-weight: 600; }
+  .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+  .metric-box { background: #0f172a; border: 1px solid #1e293b; border-radius: 6px; padding: 7px 9px; }
+  .metric-label { display: block; font-size: .58rem; color: #475569; margin-bottom: 3px; letter-spacing: .04em; }
+  .metric-val { font-size: .9rem; font-weight: 700; color: #cbd5e1; }
+  .peg-bar-bg { height: 6px; background: #1e293b; border-radius: 3px; position: relative; overflow: hidden; margin-bottom: 4px; }
+  .peg-bar-fill { height: 100%; border-radius: 3px; transition: width .5s ease; }
+  .peg-bar-mark { position: absolute; left: 25%; top: 0; bottom: 0; width: 2px; background: #64748b; opacity: .6; }
+  .peg-bar-labels { display: flex; justify-content: space-between; font-size: .6rem; }
+  footer { padding: 16px 20px 30px; position: relative; z-index: 1; }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 8px; }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: .68rem; color: #64748b; }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .disclaimer { font-size: .6rem; color: #334155; line-height: 1.8; }
+  .err-banner { background: #450a0a; border: 1px solid #991b1b; color: #fca5a5; padding: 10px 20px; font-size: .75rem; position: relative; z-index: 1; }
+  .loading-text { text-align: center; color: #38bdf8; padding: 40px; font-size: .9rem; position: relative; z-index: 1; }
+</style>
+</head>
+<body>
+<div class="grid-bg"></div>
+
+<header>
+  <div>
+    <div class="eyebrow">TWSE × TPEx OpenAPI　即時串接</div>
+    <h1>台灣封測族群　即時監控</h1>
+  </div>
+  <div class="header-right">
+    <span class="update-time" id="updateTime">載入中...</span>
+    <button class="refresh-btn" onclick="fetchAll()">↻ 刷新</button>
+  </div>
+</header>
+
+<div class="sort-bar">
+  <span class="sort-label">排序：</span>
+  <button class="sort-btn active" onclick="setSort('peg',this)">PEG 低→高</button>
+  <button class="sort-btn" onclick="setSort('eps',this)">EPS成長 高→低</button>
+  <button class="sort-btn" onclick="setSort('pe',this)">本益比 低→高</button>
+</div>
+
+<div id="err" class="err-banner" style="display:none"></div>
+<div id="loading" class="loading-text">⏳ 正在從 TWSE / TPEx 抓取資料...</div>
+<div class="cards" id="cards"></div>
+
+<footer>
+  <div class="legend">
+    <span class="legend-item"><span class="legend-dot" style="background:#34d399"></span>PEG &lt; 0.6 嚴重低估</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#86efac"></span>0.6–1.0 偏低估</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#fbbf24"></span>1.0–2.0 合理</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#f87171"></span>&gt; 2.0 偏高估</span>
+  </div>
+  <p class="disclaimer">
+    資料來源：台灣證券交易所 openapi.twse.com.tw ／ 櫃買中心 tpex.org.tw　·　每 60 秒自動更新<br>
+    本益比為交易所公告數據（前一交易日）．EPS年增率為法人預估值．僅供參考，不構成投資建議
+  </p>
+</footer>
+
+<script>
+const STOCKS_TSE = ['3711','6239','2449','8150'];
+const STOCKS_OTC = ['6257','3264'];
+const META = {
+  '3711': { name:'日月光投控', epsGrowth:89, analyst:400,  market:'TSE' },
+  '6239': { name:'力成',       epsGrowth:47, analyst:265,  market:'TSE' },
+  '2449': { name:'京元電子',   epsGrowth:10, analyst:350,  market:'TSE' },
+  '8150': { name:'南茂',       epsGrowth:3,  analyst:null, market:'TSE' },
+  '6257': { name:'矽格',       epsGrowth:39, analyst:125,  market:'OTC' },
+  '3264': { name:'欣銓',       epsGrowth:20, analyst:null, market:'OTC' },
+};
+
+let priceData = {}, peData = {}, sortKey = 'peg';
+
+function pegColor(peg){
+  if(!peg||peg<=0) return '#9ca3af';
+  if(peg<0.6)  return '#34d399';
+  if(peg<1.0)  return '#86efac';
+  if(peg<2.0)  return '#fbbf24';
+  return '#f87171';
+}
+function pegLabel(peg){
+  if(!peg||peg<=0) return '—';
+  if(peg<0.6)  return '嚴重低估';
+  if(peg<1.0)  return '偏低估';
+  if(peg<2.0)  return '合理';
+  return '偏高估';
+}
+function fmt(v, d=2){ return (v!=null&&!isNaN(v)) ? Number(v).toFixed(d) : '—'; }
+function pn(v){ if(v==null) return null; const n=parseFloat(String(v).replace(/,/g,'')); return isNaN(n)?null:n; }
+
+async function fetchAll(){
+  document.getElementById('err').style.display='none';
+  document.getElementById('updateTime').textContent='更新中...';
+  try {
+    const [r1,r2,r3,r4] = await Promise.allSettled([
+      fetch('https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL'),
+      fetch('https://openapi.twse.com.tw/v1/opendata/t187ap03_L'),
+      fetch('https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes'),
+      fetch('https://www.tpex.org.tw/openapi/v1/tpex_mainboard_pe_ratio_rpt'),
+    ]);
+    const safeJson = async r => r.status==='fulfilled' ? r.value.json().catch(()=>[]) : [];
+    const [tsePrices,tsePe,otcPrices,otcPe] = await Promise.all([r1,r2,r3,r4].map(safeJson));
+
+    // TSE prices
+    (Array.isArray(tsePrices)?tsePrices:[]).forEach(s=>{
+      const code = s.Code||s['證券代號'];
+      if(!STOCKS_TSE.includes(code)) return;
+      const close = pn(s.ClosingPrice||s['收盤價']);
+      const chg   = pn(s.Change||s['漲跌(+/-)']||0);
+      priceData[code]={ close, open:pn(s.OpeningPrice), high:pn(s.HighestPrice), low:pn(s.LowestPrice),
+        chg, chgPct: close&&chg!=null ? chg/(close-chg)*100 : null,
+        vol: pn((s.TradeVolume||'0').replace(/,/g,'')) };
+    });
+
+    // OTC prices
+    (Array.isArray(otcPrices)?otcPrices:[]).forEach(s=>{
+      const code = s.SecuritiesCompanyCode||s['代號']||s.Code;
+      if(!STOCKS_OTC.includes(code)) return;
+      const close = pn(s.Close||s['收盤']);
+      const prev  = pn(s.PreviousClose||s['前日收盤']);
+      const chg   = close!=null&&prev!=null ? close-prev : null;
+      priceData[code]={ close, open:pn(s.Open||s['開盤']), high:pn(s.High||s['最高']), low:pn(s.Low||s['最低']),
+        chg, chgPct: close&&chg!=null&&prev ? chg/prev*100 : null,
+        vol: pn((s.TradingShares||s['成交股數']||'0').replace(/,/g,'')) };
+    });
+
+    // TSE P/E
+    (Array.isArray(tsePe)?tsePe:[]).forEach(p=>{
+      const code=p['證券代號'];
+      if(STOCKS_TSE.includes(code)) peData[code]=pn(p['本益比']);
+    });
+
+    // OTC P/E
+    (Array.isArray(otcPe)?otcPe:[]).forEach(p=>{
+      const code=p['代號']||p.Code||p['SecuritiesCompanyCode'];
+      if(STOCKS_OTC.includes(code)) peData[code]=pn(p['本益比']||p.PriceEarningRatio);
+    });
+
+    const now = new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    document.getElementById('updateTime').textContent='最後更新 '+now;
+  } catch(e){
+    const el=document.getElementById('err');
+    el.textContent='API 連線失敗：'+e.message; el.style.display='block';
+    document.getElementById('updateTime').textContent='更新失敗';
+  }
+  document.getElementById('loading').style.display='none';
+  render();
+}
+
+function setSort(key, btn){
+  sortKey=key;
+  document.querySelectorAll('.sort-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  render();
+}
+
+function render(){
+  const allCodes=[...STOCKS_TSE,...STOCKS_OTC];
+  const rows = allCodes.map(code=>{
+    const meta=META[code], price=priceData[code]||{}, pe=peData[code];
+    const peg = pe&&meta.epsGrowth ? pe/meta.epsGrowth : null;
+    const upside = price.close&&meta.analyst ? (meta.analyst-price.close)/price.close*100 : null;
+    return {code,meta,price,pe,peg,upside};
+  });
+
+  rows.sort((a,b)=>{
+    if(sortKey==='peg') return (a.peg??9999)-(b.peg??9999);
+    if(sortKey==='eps') return b.meta.epsGrowth-a.meta.epsGrowth;
+    if(sortKey==='pe')  return (a.pe??9999)-(b.pe??9999);
+    return 0;
+  });
+
+  const container=document.getElementById('cards');
+  container.innerHTML=rows.map(({code,meta,price,pe,peg,upside})=>{
+    const pc=pegColor(peg), pl=pegLabel(peg);
+    const isUp=price.chg>0, isDown=price.chg<0;
+    const cc=isUp?'#34d399':isDown?'#f87171':'#9ca3af';
+    const mc=meta.market==='TSE'?{bg:'#1e40af33',fg:'#93c5fd'}:{bg:'#7e22ce33',fg:'#c4b5fd'};
+    const barW = peg ? Math.min(peg/4*100,100) : 0;
+    const uColor = upside>0?'#34d399':upside<0?'#f87171':'#9ca3af';
+
+    return `<div class="card">
+      <div class="card-glow" style="background:${pc}18"></div>
+      <div class="card-top">
+        <div>
+          <span class="card-code">${code}</span>
+          <span class="market-badge" style="background:${mc.bg};color:${mc.fg}">${meta.market}</span>
+        </div>
+        <span class="peg-badge" style="color:${pc};border-color:${pc}55;background:${pc}15">
+          ${peg?'PEG '+peg.toFixed(2):'PEG —'} · ${pl}
+        </span>
+      </div>
+      <div class="card-name">${meta.name}</div>
+      <div class="price-row">
+        <span class="price">${price.close!=null?'$'+fmt(price.close):'—'}</span>
+        <span class="chg" style="color:${cc}">
+          ${price.chg!=null?(price.chg>0?'▲':price.chg<0?'▼':'')+fmt(Math.abs(price.chg))+' ('+fmt(Math.abs(price.chgPct))+'%)':'—'}
+        </span>
+      </div>
+      <div class="ohlv">
+        ${[['開',price.open],['高',price.high],['低',price.low]].map(([k,v])=>`
+          <div class="ohlv-item"><span class="ohlv-label">${k}</span><span class="ohlv-val">${fmt(v)}</span></div>`).join('')}
+        <div class="ohlv-item">
+          <span class="ohlv-label">量(張)</span>
+          <span class="ohlv-val">${price.vol!=null?Math.round(price.vol/1000).toLocaleString():'—'}</span>
+        </div>
+      </div>
+      <div class="metrics">
+        <div class="metric-box"><span class="metric-label">本益比 (TTM)</span><span class="metric-val">${pe!=null?pe.toFixed(1)+'x':'—'}</span></div>
+        <div class="metric-box"><span class="metric-label">EPS 年增率</span><span class="metric-val" style="color:#34d399">${meta.epsGrowth}%</span></div>
+        <div class="metric-box"><span class="metric-label">法人目標價</span><span class="metric-val">${meta.analyst?'$'+meta.analyst:'—'}</span></div>
+        <div class="metric-box"><span class="metric-label">目標上行空間</span><span class="metric-val" style="color:${uColor}">${upside!=null?(upside>0?'+':'')+fmt(upside)+'%':'—'}</span></div>
+      </div>
+      <div class="peg-bar-bg">
+        <div class="peg-bar-fill" style="width:${barW}%;background:linear-gradient(90deg,${pc}88,${pc})"></div>
+        <div class="peg-bar-mark"></div>
+      </div>
+      <div class="peg-bar-labels">
+        <span style="color:#34d399">低估</span>
+        <span style="color:#9ca3af">PEG=1</span>
+        <span style="color:#f87171">高估</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+fetchAll();
+setInterval(fetchAll, 60000);
+</script>
+</body>
+</html>
