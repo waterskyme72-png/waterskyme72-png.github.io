@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>封測股即時儀表板 - 進階估值版</title>
+<title>封測股即時儀表板 - 高穩定估值版</title>
 
 <style>
   :root {
@@ -12,140 +12,62 @@
     --card-border: #1f2937;
     --text-main: #f9fafb;
     --text-dim: #9ca3af;
-    --up-color: #f87171;    /* 紅漲 */
-    --down-color: #34d399;  /* 綠跌 */
+    --up-color: #f87171;
+    --down-color: #34d399;
     --accent: #38bdf8;
-    --value-color: #6ee7b7; /* 價值指標顏色 */
+    --value-color: #6ee7b7;
   }
 
-  body {
-    margin: 0;
-    background: var(--bg-color);
-    color: var(--text-main);
-    font-family: "PingFang TC", "Microsoft JhengHei", sans-serif;
-  }
-
-  header {
-    padding: 20px 30px;
-    background: #0f172a;
-    border-bottom: 1px solid var(--card-border);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    position: sticky;
-    top: 0;
-    z-index: 100;
-  }
-
+  body { margin: 0; background: var(--bg-color); color: var(--text-main); font-family: "PingFang TC", "Microsoft JhengHei", sans-serif; }
+  header { padding: 20px 30px; background: #0f172a; border-bottom: 1px solid var(--card-border); display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; }
   h1 { margin: 0; font-size: 1.4rem; letter-spacing: 1px; }
-  
   .controls { display: flex; align-items: center; gap: 20px; }
   #time { color: var(--text-dim); font-size: 0.85rem; font-family: monospace; }
-
-  button {
-    background: transparent;
-    color: var(--accent);
-    border: 1px solid var(--accent);
-    border-radius: 6px;
-    padding: 6px 14px;
-    cursor: pointer;
-    transition: 0.2s;
-  }
+  button { background: transparent; color: var(--accent); border: 1px solid var(--accent); border-radius: 6px; padding: 6px 14px; cursor: pointer; transition: 0.2s; font-weight: bold; }
   button:hover { background: rgba(56, 189, 248, 0.1); }
-
-  .cards {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
-    gap: 20px;
-    padding: 25px;
-  }
-
-  .card {
-    background: var(--card-bg);
-    border: 1px solid var(--card-border);
-    border-radius: 20px;
-    padding: 24px;
-    transition: transform 0.2s;
-  }
-  .card:hover { border-color: #374151; transform: translateY(-2px); }
-
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 20px; padding: 25px; }
+  .card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 20px; padding: 24px; }
   .card-top { display: flex; justify-content: space-between; align-items: flex-start; }
   .code { color: var(--text-dim); font-size: 0.8rem; font-weight: bold; }
   .name { font-size: 1.3rem; font-weight: 800; margin-top: 2px; }
-
   .price-row { margin-top: 15px; display: flex; align-items: baseline; gap: 12px; }
   .price { font-size: 2.8rem; font-weight: 900; line-height: 1; }
   .change-tag { font-weight: 600; font-size: 1rem; }
-
-  /* 數據網格 */
-  .info-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-    margin-top: 25px;
-  }
-
-  .box {
-    background: #1e293b;
-    border-radius: 12px;
-    padding: 12px;
-  }
-
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 25px; }
+  .box { background: #1e293b; border-radius: 12px; padding: 12px; }
   .label { color: var(--text-dim); font-size: 0.7rem; margin-bottom: 4px; text-transform: uppercase; }
   .val { font-weight: 700; font-size: 1.05rem; }
   .highlight { color: var(--value-color); }
-
   .up { color: var(--up-color); }
   .down { color: var(--down-color); }
   .flat { color: var(--text-dim); }
-
-  #error {
-    margin: 20px;
-    background: #7f1d1d;
-    color: #fecaca;
-    padding: 15px;
-    border-radius: 10px;
-    display: none;
-    text-align: center;
-  }
-
-  #loading { text-align: center; padding: 60px; color: var(--text-dim); }
-
-  footer {
-    padding: 30px;
-    color: var(--text-dim);
-    font-size: 0.8rem;
-    text-align: center;
-    border-top: 1px solid var(--card-border);
-  }
+  #error { margin: 20px; background: #7f1d1d; color: #fecaca; padding: 15px; border-radius: 10px; display: none; text-align: center; font-weight: bold; }
+  #loading { text-align: center; padding: 60px; color: var(--text-dim); font-size: 1.2rem; }
+  footer { padding: 30px; color: var(--text-dim); font-size: 0.8rem; text-align: center; border-top: 1px solid var(--card-border); }
 </style>
 </head>
 <body>
 
 <header>
   <div>
-    <h1>台灣封測股儀表板</h1>
-    <div id="time">系統初始化中...</div>
+    <h1>封測產業即時監控</h1>
+    <div id="time">等待資料抓取...</div>
   </div>
   <div class="controls">
-    <button onclick="fetchData()">手動刷新</button>
+    <button id="refreshBtn" onclick="fetchData()">手動刷新</button>
   </div>
 </header>
 
 <div id="error"></div>
-<div id="loading">連線至 TWSE OpenAPI...</div>
+<div id="loading">正在連線至證交所 (使用專用代理)...</div>
 <div id="cards" class="cards"></div>
 
 <footer>
-  數據源：臺灣證券交易所 (TWSE) | 估值計算基於 2026 法人預估 EPS<br>
-  自動更新頻率：60秒
+  數據源：臺灣證券交易所 (TWSE) | 估值基於 2026 法人預估 EPS<br>
+  如長時間無反應，請點擊「手動刷新」。
 </footer>
 
 <script>
-/**
- * 股票配置與法人預估數據
- * eps2026: 參考 2026 年法人預估 EPS 中位數 (日月光 15.7, 力成 10.7, 京元電 9.8, 南茂 2.8)
- */
 const STOCKS_CONFIG = {
   '3711': { name: '日月光投控', epsGrowth: 89, eps2026: 15.71, analyst: 472 },
   '6239': { name: '力成', epsGrowth: 47, eps2026: 10.76, analyst: 198 },
@@ -164,49 +86,100 @@ function fmt(v, d = 2) {
   return Number(v).toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d });
 }
 
+// 核心抓取函式：含備援機制
 async function fetchData() {
   const errorEl = document.getElementById('error');
   const loadingEl = document.getElementById('loading');
+  const refreshBtn = document.getElementById('refreshBtn');
+
   errorEl.style.display = 'none';
+  loadingEl.style.display = 'block';
+  refreshBtn.disabled = true;
+  refreshBtn.innerText = "更新中...";
 
-  try {
-    // 透過 corsproxy.io 解決 GitHub Pages 部署時的跨網域問題
-    const target = 'https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL';
-    const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(target)}`;
+  const target = 'https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL';
+  
+  // 代理列表
+  const proxies = [
+    `https://corsproxy.io/?${encodeURIComponent(target)}`,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(target)}`
+  ];
 
-    const res = await fetch(proxyUrl);
-    if (!res.ok) throw new Error('無法取得交易所數據');
+  let success = false;
+  let lastError = "";
 
-    const data = await res.json();
-    render(data);
-
-    document.getElementById('time').innerText = 
-      `最後更新：${new Date().toLocaleTimeString('zh-TW', { hour12: false })}`;
-
-  } catch (err) {
-    errorEl.style.display = 'block';
-    errorEl.innerText = `⚠️ 讀取失敗: ${err.message}`;
-  } finally {
-    loadingEl.style.display = 'none';
+  for (let url of proxies) {
+    try {
+      console.log("嘗試使用代理:", url);
+      const res = await fetch(url, { signal: AbortSignal.timeout(10000) }); // 10秒逾時
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        render(data);
+        success = true;
+        break; // 成功就跳出迴圈
+      }
+    } catch (err) {
+      console.warn("代理失敗，嘗試下一個...", err);
+      lastError = err.message;
+    }
   }
+
+  if (!success) {
+    errorEl.style.display = 'block';
+    errorEl.innerText = `⚠️ 連線失敗 (${lastError})。證交所 API 尖峰時段較擁擠，請稍後再試。`;
+  } else {
+    document.getElementById('time').innerText = `最後更新：${new Date().toLocaleTimeString('zh-TW', { hour12: false })}`;
+  }
+
+  loadingEl.style.display = 'none';
+  refreshBtn.disabled = false;
+  refreshBtn.innerText = "手動刷新";
 }
 
 function render(data) {
   const container = document.getElementById('cards');
-  const list = data.filter(i => STOCKS_CONFIG[i.Code]);
+  const filtered = data.filter(i => STOCKS_CONFIG[i.Code]);
 
-  container.innerHTML = list.map(item => {
+  container.innerHTML = filtered.map(item => {
     const conf = STOCKS_CONFIG[item.Code];
     const price = num(item.ClosingPrice);
     const change = num(item.Change);
-    
-    // 計算指標
     const pe = price / conf.eps2026;
     const peg = pe / conf.epsGrowth;
-
     const color = change > 0 ? 'up' : change < 0 ? 'down' : 'flat';
     const arrow = change > 0 ? '▲' : change < 0 ? '▼' : '';
 
     return `
       <div class="card">
         <div class="card-top">
+          <div>
+            <div class="code">${item.Code}</div>
+            <div class="name">${conf.name}</div>
+          </div>
+          <div class="code" style="color:#6366f1">半導體封測</div>
+        </div>
+        <div class="price-row">
+          <div class="price ${color}">${fmt(price)}</div>
+          <div class="change-tag ${color}">${arrow}${fmt(Math.abs(change))}</div>
+        </div>
+        <div class="info-grid">
+          <div class="box"><div class="label">預估本益比 (PE)</div><div class="val">${fmt(pe, 1)}x</div></div>
+          <div class="box"><div class="label">PEG 估值</div><div class="val ${peg < 1 ? 'highlight' : ''}">${fmt(peg, 2)}</div></div>
+          <div class="box"><div class="label">EPS 年增率</div><div class="val" style="color:#fbbf24">${conf.epsGrowth}%</div></div>
+          <div class="box"><div class="label">2026 預估 EPS</div><div class="val">$${fmt(conf.eps2026, 2)}</div></div>
+          <div class="box"><div class="label">法人目標價</div><div class="val">$${conf.analyst || '—'}</div></div>
+          <div class="box"><div class="label">成交量 (張)</div><div class="val">${fmt(num(item.TradeVolume)/1000, 0)}</div></div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+fetchData();
+setInterval(fetchData, 60000);
+</script>
+
+</body>
+</html>
