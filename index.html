@@ -1,384 +1,167 @@
-<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>台股價值監控系統</title>
-
-<style>
-:root{
-  --bg:#0d1117;
-  --card:#161b22;
-  --border:#30363d;
-  --text:#c9d1d9;
-  --dim:#8b949e;
-  --up:#f85149;
-  --down:#3fb950;
-  --accent:#58a6ff;
-}
-
-*{
-  box-sizing:border-box;
-}
-
-body{
-  margin:0;
-  background:var(--bg);
-  color:var(--text);
-  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-}
-
-header{
-  padding:16px 24px;
-  background:#010409;
-  border-bottom:1px solid var(--border);
-  position:sticky;
-  top:0;
-  z-index:100;
-  display:flex;
-  flex-wrap:wrap;
-  justify-content:space-between;
-  align-items:center;
-  gap:16px;
-}
-
-.logo h1{
-  margin:0;
-  color:var(--accent);
-  font-size:1.2rem;
-}
-
-.logo small{
-  color:var(--dim);
-}
-
-.search-box{
-  background:#0d1117;
-  border:1px solid var(--border);
-  border-radius:6px;
-  padding:8px 12px;
-  color:white;
-  width:260px;
-  outline:none;
-}
-
-.controls{
-  display:flex;
-  gap:12px;
-  align-items:center;
-}
-
-button{
-  background:#238636;
-  border:none;
-  color:white;
-  padding:8px 16px;
-  border-radius:6px;
-  cursor:pointer;
-  font-weight:bold;
-}
-
-button:hover{
-  opacity:.9;
-}
-
-.sort-bar{
-  display:flex;
-  gap:8px;
-  overflow:auto;
-  padding:12px 24px;
-  border-bottom:1px solid var(--border);
-}
-
-.sbtn{
-  background:#21262d;
-  border:1px solid var(--border);
-}
-
-.sbtn.active{
-  background:#388bfd;
-}
-
-.grid{
-  display:grid;
-  grid-template-columns:repeat(auto-fill,minmax(320px,1fr));
-  gap:16px;
-  padding:20px;
-}
-
-.card{
-  background:var(--card);
-  border:1px solid var(--border);
-  border-radius:12px;
-  padding:18px;
-  transition:.2s;
-}
-
-.card:hover{
-  transform:translateY(-2px);
-  border-color:#8b949e;
-}
-
-.card-header{
-  display:flex;
-  justify-content:space-between;
-  align-items:flex-start;
-  gap:10px;
-  margin-bottom:12px;
-}
-
-.title-group{
-  flex:1;
-}
-
-.code{
-  font-family:monospace;
-  color:var(--dim);
-  font-size:.8rem;
-}
-
-.name{
-  font-size:1.1rem;
-  font-weight:800;
-  color:white;
-  margin-top:2px;
-}
-
-.peg-label{
-  padding:4px 10px;
-  border-radius:6px;
-  font-size:.7rem;
-  font-weight:bold;
-  white-space:nowrap;
-  text-align:center;
-}
-
-.price-row{
-  display:flex;
-  align-items:baseline;
-  gap:10px;
-  margin-bottom:14px;
-}
-
-.price{
-  font-size:2rem;
-  font-weight:800;
-}
-
-.change{
-  font-size:1rem;
-  font-weight:600;
-}
-
-.up{
-  color:var(--up);
-}
-
-.down{
-  color:var(--down);
-}
-
-.value-grid{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:8px;
-  margin-top:12px;
-}
-
-.v-box{
-  background:#0d1117;
-  padding:10px;
-  border-radius:6px;
-}
-
-.v-lbl{
-  display:block;
-  font-size:.65rem;
-  color:var(--dim);
-  margin-bottom:4px;
-}
-
-.v-val{
-  font-size:.95rem;
-  font-weight:700;
-}
-
-.grow{
-  color:#fbbf24;
-}
-
-#loading{
-  position:fixed;
-  inset:0;
-  background:rgba(0,0,0,.7);
-  display:none;
-  justify-content:center;
-  align-items:center;
-  z-index:999;
-  font-size:1.2rem;
-}
-</style>
-</head>
-
-<body>
-
-<div id="loading">📡 數據同步中...</div>
-
-<header>
-
-  <div class="logo">
-    <h1>台股價值監控系統</h1>
-    <small>FinMind API 全自動版</small>
-  </div>
-
-  <input
-    type="text"
-    id="searchInput"
-    class="search-box"
-    placeholder="搜尋股票..."
-    oninput="render()"
-  >
-
-  <div class="controls">
-    <span id="updateTime">尚未同步</span>
-    <button onclick="fetchAllData()">刷新</button>
-  </div>
-
-</header>
-
-<div class="sort-bar">
-
-  <button class="sbtn active" onclick="setSort('price', this)">
-    股價排序
-  </button>
-
-  <button class="sbtn" onclick="setSort('peg', this)">
-    PEG 排序
-  </button>
-
-  <button class="sbtn" onclick="setSort('growth', this)">
-    成長率排序
-  </button>
-
-  <button class="sbtn" onclick="setSort('change', this)">
-    漲跌排序
-  </button>
-
-</div>
-
-<div class="grid" id="mainGrid"></div>
-
 <script>
 
-// ===== 股票池 =====
+const STOCK_INFO = {
 
-const STOCK_POOL = [
-  "2330",
-  "2454",
-  "2317",
-  "2382",
-  "6669",
-  "3017",
-  "2308",
-  "1519",
-  "1513",
-  "1503",
-  "1514",
-  "2603",
-  "2881"
-];
+  "2330": {
+    name: "台積電",
+    growth: 22
+  },
 
-// ===== 成長率預估 =====
-// 未來成長率通常沒有公開 API
-// 建議自己維護
+  "2454": {
+    name: "聯發科",
+    growth: 18
+  },
 
-const GROWTH_EST = {
-  "2330": 22,
-  "2454": 18,
-  "2317": 22,
-  "2382": 28,
-  "6669": 35,
-  "3017": 32,
-  "2308": 15,
-  "1519": 30,
-  "1513": 12,
-  "1503": 8,
-  "1514": 21,
-  "2603": 5,
-  "2881": 8
+  "2317": {
+    name: "鴻海",
+    growth: 22
+  },
+
+  "2382": {
+    name: "廣達",
+    growth: 28
+  },
+
+  "6669": {
+    name: "緯穎",
+    growth: 35
+  },
+
+  "3017": {
+    name: "奇鋐",
+    growth: 32
+  },
+
+  "2308": {
+    name: "台達電",
+    growth: 15
+  },
+
+  "1519": {
+    name: "華城",
+    growth: 30
+  },
+
+  "1513": {
+    name: "中興電",
+    growth: 12
+  },
+
+  "1503": {
+    name: "士電",
+    growth: 8
+  },
+
+  "1514": {
+    name: "亞力",
+    growth: 21
+  },
+
+  "2603": {
+    name: "長榮",
+    growth: 5
+  },
+
+  "2881": {
+    name: "富邦金",
+    growth: 8
+  }
+
 };
 
-let currentMarket = [];
-let sortKey = "price";
+const STOCK_POOL =
+  Object.keys(STOCK_INFO);
 
-// ===== 排序 =====
+let currentMarket = [];
+
+let sortKey = "price";
 
 function setSort(key, btn){
 
   sortKey = key;
 
-  document.querySelectorAll(".sbtn")
-    .forEach(b => b.classList.remove("active"));
+  document
+    .querySelectorAll(".sbtn")
+    .forEach(b =>
+      b.classList.remove("active")
+    );
 
   btn.classList.add("active");
 
   render();
 }
 
-// ===== 抓單一股票 =====
-
 async function fetchStock(code){
 
   try{
 
-    // 股價
     const priceUrl =
       `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPrice&data_id=${code}&start_date=2026-01-01`;
 
-    // PER
     const perUrl =
       `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPER&data_id=${code}&start_date=2026-01-01`;
 
-    const [priceRes, perRes] = await Promise.all([
-      fetch(priceUrl),
-      fetch(perUrl)
-    ]);
+    const [priceRes, perRes] =
+      await Promise.all([
+        fetch(priceUrl),
+        fetch(perUrl)
+      ]);
 
-    const priceJson = await priceRes.json();
-    const perJson = await perRes.json();
+    const priceJson =
+      await priceRes.json();
 
-    if(!priceJson.data?.length){
+    const perJson =
+      await perRes.json();
+
+    if(
+      !priceJson.data ||
+      !priceJson.data.length
+    ){
       return null;
     }
 
     const latestPrice =
-      priceJson.data[priceJson.data.length - 1];
+      priceJson.data[
+        priceJson.data.length - 1
+      ];
 
     const latestPer =
       perJson.data?.length
-        ? perJson.data[perJson.data.length - 1]
+        ? perJson.data[
+            perJson.data.length - 1
+          ]
         : null;
 
-    const price = latestPrice.close;
+    const price =
+      Number(latestPrice.close);
+
+    const open =
+      Number(latestPrice.open);
 
     const change =
-      latestPrice.max - latestPrice.min;
+      price - open;
 
     const pct =
-      ((change / (price - change)) * 100).toFixed(2);
+      open
+        ? (
+            (change / open) * 100
+          ).toFixed(2)
+        : "0.00";
 
     const per =
       latestPer?.PER || null;
 
     const eps =
-      per ? (price / per).toFixed(2) : null;
+      per
+        ? (price / per).toFixed(2)
+        : null;
 
     const growth =
-      GROWTH_EST[code] || 0;
+      STOCK_INFO[code]?.growth || 0;
 
     const peg =
-      (per && growth)
-        ? (per / growth)
+      per && growth
+        ? per / growth
         : null;
 
     return {
@@ -386,7 +169,7 @@ async function fetchStock(code){
       code,
 
       name:
-        latestPrice.stock_name,
+        STOCK_INFO[code]?.name || code,
 
       price,
 
@@ -405,13 +188,11 @@ async function fetchStock(code){
 
   }catch(err){
 
-    console.error(code, err);
+    console.error(err);
 
     return null;
   }
 }
-
-// ===== 抓全部 =====
 
 async function fetchAllData(){
 
@@ -430,10 +211,12 @@ async function fetchAllData(){
     currentMarket =
       results.filter(Boolean);
 
-    document.getElementById("updateTime")
+    document
+      .getElementById("updateTime")
       .textContent =
       "更新：" +
-      new Date().toLocaleTimeString();
+      new Date()
+        .toLocaleTimeString();
 
     render();
 
@@ -441,7 +224,7 @@ async function fetchAllData(){
 
     console.error(err);
 
-    alert("讀取失敗");
+    alert("資料讀取失敗");
 
   }finally{
 
@@ -449,23 +232,30 @@ async function fetchAllData(){
   }
 }
 
-// ===== render =====
-
 function render(){
 
   const grid =
     document.getElementById("mainGrid");
 
   const query =
-    document.getElementById("searchInput")
+    document
+      .getElementById("searchInput")
       .value
       .toLowerCase();
 
   let filtered =
-    currentMarket.filter(s =>
-      s.code.includes(query) ||
-      s.name.includes(query)
-    );
+    currentMarket.filter(s => {
+
+      const codeMatch =
+        s.code.includes(query);
+
+      const nameMatch =
+        s.name
+          .toLowerCase()
+          .includes(query);
+
+      return codeMatch || nameMatch;
+    });
 
   filtered.sort((a,b)=>{
 
@@ -496,33 +286,49 @@ function render(){
   });
 
   grid.innerHTML =
-    filtered.map(s=>{
+    filtered.map(s => {
 
       const isUp =
         s.change > 0;
 
       const colorClass =
-        isUp ? "up"
+        isUp
+          ? "up"
           : s.change < 0
             ? "down"
             : "";
 
-      let pegColor = "#999";
-      let pegText = "無數據";
+      let pegColor =
+        "#999";
+
+      let pegText =
+        "無數據";
 
       if(s.peg){
 
         if(s.peg < 1){
-          pegColor = "#34d399";
-          pegText = "低估";
+
+          pegColor =
+            "#34d399";
+
+          pegText =
+            "低估";
         }
         else if(s.peg > 1.5){
-          pegColor = "#f87171";
-          pegText = "偏貴";
+
+          pegColor =
+            "#f87171";
+
+          pegText =
+            "偏貴";
         }
         else{
-          pegColor = "#fbbf24";
-          pegText = "合理";
+
+          pegColor =
+            "#fbbf24";
+
+          pegText =
+            "合理";
         }
       }
 
@@ -533,8 +339,15 @@ function render(){
         <div class="card-header">
 
           <div class="title-group">
-            <div class="code">${s.code}</div>
-            <div class="name">${s.name}</div>
+
+            <div class="code">
+              ${s.code}
+            </div>
+
+            <div class="name">
+              ${s.name}
+            </div>
+
           </div>
 
           ${
@@ -569,9 +382,19 @@ function render(){
           </div>
 
           <div class="change ${colorClass}">
-            ${isUp ? "▲" : "▼"}
+
+            ${
+              isUp
+                ? "▲"
+                : s.change < 0
+                  ? "▼"
+                  : ""
+            }
+
             ${Math.abs(s.change).toFixed(2)}
+
             (${s.pct}%)
+
           </div>
 
         </div>
@@ -584,17 +407,21 @@ function render(){
             </span>
 
             <span class="v-val grow">
-              ${s.growth || "--"}%
+              ${s.growth}%
             </span>
           </div>
 
           <div class="v-box">
             <span class="v-lbl">
-              本益比 PER
+              PER
             </span>
 
             <span class="v-val">
-              ${s.per ? s.per.toFixed(2) : "--"}
+              ${
+                s.per
+                  ? s.per.toFixed(2)
+                  : "--"
+              }
             </span>
           </div>
 
@@ -614,7 +441,11 @@ function render(){
             </span>
 
             <span class="v-val">
-              ${s.peg ? s.peg.toFixed(2) : "--"}
+              ${
+                s.peg
+                  ? s.peg.toFixed(2)
+                  : "--"
+              }
             </span>
           </div>
 
@@ -626,15 +457,11 @@ function render(){
     }).join("");
 }
 
-// ===== 初始載入 =====
-
 fetchAllData();
 
-// ===== 每 5 分鐘更新 =====
-
-setInterval(fetchAllData, 300000);
+setInterval(
+  fetchAllData,
+  300000
+);
 
 </script>
-
-</body>
-</html>
