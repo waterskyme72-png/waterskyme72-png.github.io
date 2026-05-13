@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>台灣封測股即時儀表板</title>
+
+<style>
+body{
+  background:#0b1220;
+  color:#e5e7eb;
+  font-family:Arial;
+  margin:0;
+}
+header{
+  padding:20px;
+  border-bottom:1px solid #1f2937;
+}
+h1{
+  margin:0;
+}
+.sub{
+  color:#38bdf8;
+  margin-top:6px;
+  font-size:.9rem;
+}
+.topbar{
+  margin-top:10px;
+}
+button{
+  background:#1e293b;
+  color:white;
+  border:none;
+  padding:8px 14px;
+  border-radius:8px;
+  cursor:pointer;
+}
+.cards{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(300px,1fr));
+  gap:16px;
+  padding:20px;
+}
+.card{
+  background:#111827;
+  border:1px solid #374151;
+  border-radius:14px;
+  padding:18px;
+}
+.name{
+  font-size:1.2rem;
+  font-weight:bold;
+}
+.code{
+  color:#94a3b8;
+  font-size:.85rem;
+}
+.price{
+  font-size:2rem;
+  font-weight:bold;
+  margin-top:12px;
+}
+.up{color:#34d399}
+.down{color:#f87171}
+.flat{color:#cbd5e1}
+.grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-top:16px;
+}
+.box{
+  background:#0f172a;
+  padding:10px;
+  border-radius:8px;
+}
+.label{
+  color:#94a3b8;
+  font-size:.75rem;
+}
+.val{
+  margin-top:4px;
+  font-weight:bold;
+}
+.loading{
+  text-align:center;
+  padding:40px;
+}
+.error{
+  margin:20px;
+  padding:12px;
+  border-radius:10px;
+  background:#450a0a;
+  color:#fecaca;
+  display:none;
+}
+footer{
+  color:#64748b;
+  padding:20px;
+  font-size:.85rem;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <h1>台灣封測股 即時儀表板</h1>
+  <div class="sub">改用 TWSE 官方 API（可直接瀏覽器存取）</div>
+
+  <div class="topbar">
+    <button onclick="fetchData()">重新整理</button>
+    <span id="time"></span>
+  </div>
+</header>
+
+<div id="error" class="error"></div>
+
+<div id="loading" class="loading">
+正在讀取資料...
+</div>
+
+<div id="cards" class="cards"></div>
+
+<footer>
+資料來源：TWSE 官方 OpenAPI<br>
+每 60 秒更新
+</footer>
+
+<script>
+
+const STOCKS = {
+  '3711': {name:'日月光投控', epsGrowth:89, analyst:400},
+  '6239': {name:'力成', epsGrowth:47, analyst:265},
+  '2449': {name:'京元電子', epsGrowth:10, analyst:350},
+  '8150': {name:'南茂', epsGrowth:3, analyst:null},
+  '6257': {name:'矽格', epsGrowth:39, analyst:125},
+  '3264': {name:'欣銓', epsGrowth:20, analyst:null},
+};
+
+function fmt(v,d=2){
+  if(v===null || v===undefined || isNaN(v)) return '—';
+  return Number(v).toFixed(d);
+}
+
+function num(v){
+  if(v===null || v===undefined) return null;
+  const n = parseFloat(String(v).replace(/,/g,''));
+  return isNaN(n) ? null : n;
+}
+
+async function fetchData(){
+
+  document.getElementById('error').style.display='none';
+
+  try{
+
+    // 使用 TWSE 官方 API
+    const res = await fetch(
+      'https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL'
+    );
+
+    if(!res.ok){
+      throw new Error('TWSE API 無法連線');
+    }
+
+    const data = await res.json();
+
+    const rows = [];
+
+    for(const item of data){
+
+      const code = item.Code;
+
+      if(!STOCKS[code]) continue;
+
+      const meta = STOCKS[code];
+
+      const price = num(item.ClosingPrice);
+      const open = num(item.OpeningPrice);
+      const high = num(item.HighestPrice);
+      const low = num(item.LowestPrice);
+      const change = num(item.Change);
+      const volume = num(item.TradeVolume);
+
+      rows.push({
+        code,
+        name:meta.name,
+        epsGrowth:meta.epsGrowth,
+        analyst:meta.analyst,
+        price,
+        open,
+        high,
+        low,
+        change,
+        volume
+      });
+    }
+
+    render(rows);
+
+    document.getElementById('time').innerHTML =
+      '　最後更新：' +
+      new Date().toLocaleTimeString('zh-TW');
+
+  }catch(err){
+
+    const el = document.getElementById('error');
+
+    el.style.display='block';
+
+    el.innerHTML =
+      'API 讀取失敗：' + err.message +
+      '<br><br>若直接開啟本機 HTML 被瀏覽器阻擋，請改用：<br>' +
+      '1. VSCode Live Server<br>' +
+      '2. Python http.server<br>' +
+      '3. 上傳到網頁空間';
+
+  }
+
+  document.getElementById('loading').style.display='none';
+}
+
+function render(rows){
+
+  const cards = document.getElementById('cards');
+
+  cards.innerHTML = rows.map(r=>{
+
+    const up = r.change > 0;
+    const down = r.change < 0;
+
+    const cls = up ? 'up' : down ? 'down' : 'flat';
+
+    const pct =
+      (r.price && r.change)
+      ? (r.change / (r.price-r.change) * 100)
+      : null;
+
+    return `
+      <div class="card">
+
+        <div class="code">${r.code}</div>
+
+        <div class="name">
+          ${r.name}
+        </div>
+
+        <div class="price">
+          ${r.price ? '$'+fmt(r.price) : '—'}
+        </div>
+
+        <div class="${cls}">
+          ${r.change ? fmt(r.change) : '—'}
+          ${pct ? '('+fmt(pct)+'%)' : ''}
+        </div>
+
+        <div class="grid">
+
+          <div class="box">
+            <div class="label">開盤</div>
+            <div class="val">${fmt(r.open)}</div>
+          </div>
+
+          <div class="box">
+            <div class="label">最高</div>
+            <div class="val">${fmt(r.high)}</div>
+          </div>
+
+          <div class="box">
+            <div class="label">最低</div>
+            <div class="val">${fmt(r.low)}</div>
+          </div>
+
+          <div class="box">
+            <div class="label">成交量</div>
+            <div class="val">
+              ${r.volume ? Number(r.volume).toLocaleString() : '—'}
+            </div>
+          </div>
+
+          <div class="box">
+            <div class="label">EPS 年增率</div>
+            <div class="val">${r.epsGrowth}%</div>
+          </div>
+
+          <div class="box">
+            <div class="label">法人目標價</div>
+            <div class="val">
+              ${r.analyst ? '$'+r.analyst : '—'}
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    `;
+
+  }).join('');
+
+}
+
+fetchData();
+
+setInterval(fetchData,60000);
+
+</script>
+
+</body>
+</html>
