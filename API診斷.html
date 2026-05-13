@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>封測股儀表板 - 診斷版</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #080d14; color: #e2e8f0; font-family: 'Courier New', monospace; padding: 16px; }
+  h2 { color: #38bdf8; font-size: 1rem; margin-bottom: 10px; }
+  .section { background: #0d1727; border: 1px solid #1e293b; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
+  .ok  { color: #34d399; }
+  .err { color: #f87171; }
+  .dim { color: #64748b; font-size: .75rem; }
+  pre { font-size: .68rem; color: #94a3b8; white-space: pre-wrap; word-break: break-all; max-height: 220px; overflow-y: auto; background: #050a12; padding: 10px; border-radius: 6px; margin-top: 8px; }
+  button { background: #1e293b; border: 1px solid #38bdf8; color: #38bdf8; padding: 8px 18px; border-radius: 6px; cursor: pointer; font-size: .85rem; margin-bottom: 16px; }
+  .status-row { display: flex; gap: 10px; align-items: center; margin-bottom: 6px; flex-wrap: wrap; }
+  .badge { font-size: .65rem; padding: 2px 8px; border-radius: 3px; font-weight: 700; }
+  .badge-ok  { background: #14532d; color: #34d399; }
+  .badge-err { background: #450a0a; color: #f87171; }
+  .badge-wait{ background: #1e293b; color: #94a3b8; }
+</style>
+</head>
+<body>
+
+<h2>🔍 TWSE / TPEx API 診斷工具</h2>
+<p class="dim" style="margin-bottom:14px">自動抓取 API 回應，顯示實際欄位名稱，用於找出資料對應問題</p>
+<button onclick="runDiag()">▶ 開始診斷</button>
+
+<div id="results"></div>
+
+<script>
+const TARGETS = {
+  '3711': 'TSE', '6239': 'TSE', '2449': 'TSE', '8150': 'TSE',
+  '6257': 'OTC', '3264': 'OTC',
+};
+
+const APIS = [
+  { id: 'tse_price', label: 'TSE 股價 (STOCK_DAY_ALL)', url: 'https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL' },
+  { id: 'tse_pe',    label: 'TSE 本益比 (t187ap03_L)',   url: 'https://openapi.twse.com.tw/v1/opendata/t187ap03_L' },
+  { id: 'otc_price', label: 'OTC 股價 (tpex_mainboard_quotes)', url: 'https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes' },
+  { id: 'otc_pe',    label: 'OTC 本益比 (tpex_mainboard_pe_ratio_rpt)', url: 'https://www.tpex.org.tw/openapi/v1/tpex_mainboard_pe_ratio_rpt' },
+];
+
+function el(id){ return document.getElementById(id); }
+
+async function runDiag(){
+  el('results').innerHTML = '<p class="dim">⏳ 正在呼叫 API，請稍候...</p>';
+  const out = [];
+
+  for(const api of APIS){
+    let badge = 'badge-wait', status = '等待中', raw = null, sample = null, matched = [];
+    try {
+      const res = await fetch(api.url);
+      if(!res.ok) throw new Error('HTTP ' + res.status);
+      const json = await res.json();
+      raw = json;
+
+      // 從陣列中找封測股
+      if(Array.isArray(json) && json.length > 0){
+        // 顯示第一筆的所有欄位名稱（讓我們看清楚格式）
+        const firstItem = json[0];
+        const keys = Object.keys(firstItem);
+
+        // 嘗試找封測股
+        const targets = Object.keys(TARGETS);
+        const found = json.filter(item => {
+          const val = Object.values(item).find(v => targets.includes(String(v)));
+          return !!val;
+        });
+        matched = found;
+
+        sample = {
+          '【第一筆欄位名稱】': keys,
+          '【第一筆資料範例】': firstItem,
+          '【封測股命中數量】': found.length,
+          '【封測股資料】': found.slice(0,3),
+        };
+        badge = 'badge-ok';
+        status = `✓ 成功　共 ${json.length} 筆，命中封測股 ${found.length} 筆`;
+      } else {
+        sample = { '回傳內容': json };
+        badge = 'badge-ok';
+        status = '✓ 成功，但資料為空或非陣列';
+      }
+    } catch(e) {
+      badge = 'badge-err';
+      status = '✗ 失敗：' + e.message;
+      sample = { error: e.message };
+    }
+
+    out.push({ api, badge, status, sample });
+  }
+
+  el('results').innerHTML = out.map(({ api, badge, status, sample }) => `
+    <div class="section">
+      <div class="status-row">
+        <span class="badge ${badge}">${badge === 'badge-ok' ? 'OK' : badge === 'badge-err' ? 'FAIL' : '...'}</span>
+        <strong style="color:#f1f5f9;font-size:.85rem">${api.label}</strong>
+      </div>
+      <p class="dim" style="margin-bottom:6px">${api.url}</p>
+      <p style="font-size:.8rem;margin-bottom:6px" class="${badge === 'badge-ok' ? 'ok' : 'err'}">${status}</p>
+      <pre>${JSON.stringify(sample, null, 2)}</pre>
+    </div>
+  `).join('');
+}
+</script>
+</body>
+</html>
