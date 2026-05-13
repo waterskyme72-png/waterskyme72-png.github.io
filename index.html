@@ -1,14 +1,11 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
-
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-<title>台股價值監控系統</title>
+<title>台股前200強價值監控系統</title>
 
 <style>
-
 :root{
   --bg:#0d1117;
   --card:#161b22;
@@ -220,7 +217,6 @@ button:hover{
   z-index:999;
   font-size:1.2rem;
 }
-
 </style>
 </head>
 
@@ -233,8 +229,8 @@ button:hover{
 <header>
 
   <div class="logo">
-    <h1>台股價值監控系統</h1>
-    <small>FinMind API 自動化版</small>
+    <h1>台股前200強價值監控系統</h1>
+    <small>TWSE + FinMind 全自動版</small>
   </div>
 
   <input
@@ -259,6 +255,13 @@ button:hover{
 
   <button
     class="sbtn active"
+    onclick="setSort('marketValue', this)"
+  >
+    市值排序
+  </button>
+
+  <button
+    class="sbtn"
     onclick="setSort('price', this)"
   >
     股價排序
@@ -269,13 +272,6 @@ button:hover{
     onclick="setSort('peg', this)"
   >
     PEG 排序
-  </button>
-
-  <button
-    class="sbtn"
-    onclick="setSort('growth', this)"
-  >
-    成長率排序
   </button>
 
   <button
@@ -291,235 +287,82 @@ button:hover{
 
 <script>
 
-const STOCK_INFO = {
-
-  "2330": {
-    name: "台積電",
-    growth: 22
-  },
-
-  "2454": {
-    name: "聯發科",
-    growth: 18
-  },
-
-  "2317": {
-    name: "鴻海",
-    growth: 22
-  },
-
-  "2382": {
-    name: "廣達",
-    growth: 28
-  },
-
-  "6669": {
-    name: "緯穎",
-    growth: 35
-  },
-
-  "3017": {
-    name: "奇鋐",
-    growth: 32
-  },
-
-  "2308": {
-    name: "台達電",
-    growth: 15
-  },
-
-  "1519": {
-    name: "華城",
-    growth: 30
-  },
-
-  "1513": {
-    name: "中興電",
-    growth: 12
-  },
-
-  "1503": {
-    name: "士電",
-    growth: 8
-  },
-
-  "1514": {
-    name: "亞力",
-    growth: 21
-  },
-
-  "2603": {
-    name: "長榮",
-    growth: 5
-  },
-
-  "2881": {
-    name: "富邦金",
-    growth: 8
-  }
-
-};
-
-const STOCK_POOL =
-  Object.keys(STOCK_INFO);
-
 let currentMarket = [];
-
-let sortKey = "price";
+let sortKey = 'marketValue';
 
 function setSort(key, btn){
 
   sortKey = key;
 
   document
-    .querySelectorAll(".sbtn")
-    .forEach(b =>
-      b.classList.remove("active")
-    );
+    .querySelectorAll('.sbtn')
+    .forEach(b => b.classList.remove('active'));
 
-  btn.classList.add("active");
+  btn.classList.add('active');
 
   render();
-}
-
-async function fetchStock(code){
-
-  try{
-
-    const today =
-      new Date();
-
-    const year =
-      today.getFullYear();
-
-    const startDate =
-      `${year}-01-01`;
-
-    const priceUrl =
-      `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPrice&data_id=${code}&start_date=${startDate}`;
-
-    const perUrl =
-      `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPER&data_id=${code}&start_date=${startDate}`;
-
-    const [priceRes, perRes] =
-      await Promise.all([
-        fetch(priceUrl),
-        fetch(perUrl)
-      ]);
-
-    const priceJson =
-      await priceRes.json();
-
-    const perJson =
-      await perRes.json();
-
-    if(
-      !priceJson.data ||
-      !priceJson.data.length
-    ){
-      return null;
-    }
-
-    const latestPrice =
-      priceJson.data[
-        priceJson.data.length - 1
-      ];
-
-    const latestPer =
-      perJson.data?.length
-        ? perJson.data[
-            perJson.data.length - 1
-          ]
-        : null;
-
-    const price =
-      Number(latestPrice.close);
-
-    const open =
-      Number(latestPrice.open);
-
-    const change =
-      price - open;
-
-    const pct =
-      open
-        ? (
-            (change / open) * 100
-          ).toFixed(2)
-        : "0.00";
-
-    const per =
-      latestPer?.PER || null;
-
-    const eps =
-      per
-        ? (price / per).toFixed(2)
-        : null;
-
-    const growth =
-      STOCK_INFO[code]?.growth || 0;
-
-    const peg =
-      per && growth
-        ? per / growth
-        : null;
-
-    return {
-
-      code,
-
-      name:
-        STOCK_INFO[code]?.name || code,
-
-      price,
-
-      change,
-
-      pct,
-
-      per,
-
-      eps,
-
-      growth,
-
-      peg
-    };
-
-  }catch(err){
-
-    console.error(
-      `股票 ${code} 讀取失敗`,
-      err
-    );
-
-    return null;
-  }
 }
 
 async function fetchAllData(){
 
   const loading =
-    document.getElementById("loading");
+    document.getElementById('loading');
 
-  loading.style.display = "flex";
+  loading.style.display = 'flex';
 
   try{
 
-    const results =
-      await Promise.all(
-        STOCK_POOL.map(fetchStock)
-      );
+    // TWSE 全市場資料
+    const twseUrl =
+      'https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL';
 
-    currentMarket =
-      results.filter(Boolean);
+    const res = await fetch(twseUrl);
+
+    const data = await res.json();
+
+    // 依成交金額排序，取前200強
+    const top200 = data
+      .map(s => {
+
+        const price = parseFloat(
+          s.ClosingPrice.replace(/,/g, '')
+        );
+
+        const volume = parseFloat(
+          s.TradeVolume.replace(/,/g, '')
+        );
+
+        const value = price * volume;
+
+        const change = parseFloat(
+          (s.Change || '0').replace(/,/g, '')
+        );
+
+        return {
+          code: s.Code,
+          name: s.Name,
+          price,
+          change,
+          volume,
+          marketValue: value
+        };
+      })
+      .filter(s => !isNaN(s.price))
+      .sort((a,b)=> b.marketValue - a.marketValue)
+      .slice(0, 200);
+
+    // 加入 FinMind PER
+    const enhanced = await Promise.all(
+      top200.map(fetchPERData)
+    );
+
+    currentMarket = enhanced;
 
     document
-      .getElementById("updateTime")
+      .getElementById('updateTime')
       .textContent =
-      "更新：" +
-      new Date()
-        .toLocaleTimeString();
+      '更新：' +
+      new Date().toLocaleTimeString();
 
     render();
 
@@ -527,60 +370,117 @@ async function fetchAllData(){
 
     console.error(err);
 
-    alert("資料讀取失敗");
+    alert('資料讀取失敗');
 
   }finally{
 
-    loading.style.display = "none";
+    loading.style.display = 'none';
+  }
+}
+
+async function fetchPERData(stock){
+
+  try{
+
+    const year =
+      new Date().getFullYear();
+
+    const url =
+      `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPER&data_id=${stock.code}&start_date=${year}-01-01`;
+
+    const res = await fetch(url);
+
+    const json = await res.json();
+
+    const latest =
+      json.data?.length
+        ? json.data[json.data.length - 1]
+        : null;
+
+    const per = latest?.PER || null;
+
+    const eps =
+      per
+        ? (stock.price / per).toFixed(2)
+        : null;
+
+    // 簡易成長率估算
+    let growth = null;
+
+    if(per){
+      growth =
+        Math.max(
+          5,
+          Math.min(
+            40,
+            (30 - per)
+          )
+        );
+    }
+
+    const peg =
+      per && growth
+        ? per / growth
+        : null;
+
+    return {
+      ...stock,
+      per,
+      eps,
+      growth,
+      peg
+    };
+
+  }catch(err){
+
+    return {
+      ...stock,
+      per:null,
+      eps:null,
+      growth:null,
+      peg:null
+    };
   }
 }
 
 function render(){
 
   const grid =
-    document.getElementById("mainGrid");
+    document.getElementById('mainGrid');
 
   const query =
     document
-      .getElementById("searchInput")
+      .getElementById('searchInput')
       .value
       .toLowerCase();
 
   let filtered =
     currentMarket.filter(s => {
 
-      const codeMatch =
-        s.code.includes(query);
-
-      const nameMatch =
-        s.name
-          .toLowerCase()
-          .includes(query);
-
-      return codeMatch || nameMatch;
+      return (
+        s.code.includes(query) ||
+        s.name.toLowerCase().includes(query)
+      );
     });
 
   filtered.sort((a,b)=>{
 
-    if(sortKey === "price"){
+    if(sortKey === 'marketValue'){
+      return b.marketValue - a.marketValue;
+    }
+
+    if(sortKey === 'price'){
       return b.price - a.price;
     }
 
-    if(sortKey === "change"){
+    if(sortKey === 'change'){
       return b.change - a.change;
     }
 
-    if(sortKey === "growth"){
-      return b.growth - a.growth;
-    }
+    if(sortKey === 'peg'){
 
-    if(sortKey === "peg"){
-
-      const A =
-        a.peg ?? 999;
-
-      const B =
-        b.peg ?? 999;
+      const A = a.peg ?? 999;
+      const B = b.peg ?? 999;
 
       return A - B;
     }
@@ -591,47 +491,31 @@ function render(){
   grid.innerHTML =
     filtered.map(s => {
 
-      const isUp =
-        s.change > 0;
+      const isUp = s.change > 0;
 
       const colorClass =
         isUp
-          ? "up"
+          ? 'up'
           : s.change < 0
-            ? "down"
-            : "";
+            ? 'down'
+            : '';
 
-      let pegColor =
-        "#999";
-
-      let pegText =
-        "無數據";
+      let pegColor = '#999';
+      let pegText = '無資料';
 
       if(s.peg){
 
         if(s.peg < 1){
-
-          pegColor =
-            "#34d399";
-
-          pegText =
-            "低估";
+          pegColor = '#34d399';
+          pegText = '低估';
         }
         else if(s.peg > 1.5){
-
-          pegColor =
-            "#f87171";
-
-          pegText =
-            "偏貴";
+          pegColor = '#f87171';
+          pegText = '偏貴';
         }
         else{
-
-          pegColor =
-            "#fbbf24";
-
-          pegText =
-            "合理";
+          pegColor = '#fbbf24';
+          pegText = '合理';
         }
       }
 
@@ -674,8 +558,7 @@ function render(){
 
             </div>
             `
-            :
-            ""
+            : ''
           }
 
         </div>
@@ -690,15 +573,13 @@ function render(){
 
             ${
               isUp
-                ? "▲"
+                ? '▲'
                 : s.change < 0
-                  ? "▼"
-                  : ""
+                  ? '▼'
+                  : ''
             }
 
             ${Math.abs(s.change).toFixed(2)}
-
-            (${s.pct}%)
 
           </div>
 
@@ -709,11 +590,11 @@ function render(){
           <div class="v-box">
 
             <span class="v-lbl">
-              成長率預估
+              預估 EPS
             </span>
 
-            <span class="v-val grow">
-              ${s.growth}%
+            <span class="v-val">
+              ${s.eps || '--'}
             </span>
 
           </div>
@@ -725,25 +606,7 @@ function render(){
             </span>
 
             <span class="v-val">
-
-              ${
-                s.per
-                  ? s.per.toFixed(2)
-                  : "--"
-              }
-
-            </span>
-
-          </div>
-
-          <div class="v-box">
-
-            <span class="v-lbl">
-              推估 EPS
-            </span>
-
-            <span class="v-val">
-              ${s.eps || "--"}
+              ${s.per ? s.per.toFixed(2) : '--'}
             </span>
 
           </div>
@@ -755,13 +618,19 @@ function render(){
             </span>
 
             <span class="v-val">
+              ${s.peg ? s.peg.toFixed(2) : '--'}
+            </span>
 
-              ${
-                s.peg
-                  ? s.peg.toFixed(2)
-                  : "--"
-              }
+          </div>
 
+          <div class="v-box">
+
+            <span class="v-lbl">
+              市值強度
+            </span>
+
+            <span class="v-val grow">
+              ${(s.marketValue / 100000000).toFixed(0)} 億
             </span>
 
           </div>
@@ -771,15 +640,13 @@ function render(){
       </div>
 
       `;
-    }).join("");
+
+    }).join('');
 }
 
 fetchAllData();
 
-setInterval(
-  fetchAllData,
-  300000
-);
+setInterval(fetchAllData, 300000);
 
 </script>
 
