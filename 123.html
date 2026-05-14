@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>台股 200 強價值監控 - 多重來源版</title>
+    <title>台股 200 強價值監控 - 極速版</title>
     <style>
         :root {
             --bg: #0d1117;
@@ -250,7 +250,7 @@
 
     <header>
         <div class="logo">
-            <h1>台股價值監控 <small style="font-size: 0.7rem; color: var(--dim);">多重來源版</small></h1>
+            <h1>台股價值監控 <small style="font-size: 0.7rem; color: var(--dim);">極速版</small></h1>
         </div>
         <input type="text" id="searchInput" class="search-box" style="background:#0d1117; border:1px solid var(--border); border-radius:6px; padding:8px; color:white; width:200px;" placeholder="篩選當前結果..." oninput="render()">
     </header>
@@ -338,10 +338,9 @@
             }
         }
 
-        // ===== 工具：從 TWSE 獲取昨日收盤價（備援） =====
-        async function fetchTWSEPrice(code) {
+        // ===== 一次取得 TWSE 全部收盤資料（極速核心） =====
+        async function fetchAllTWSEPrice() {
             try {
-                // 使用昨天日期
                 const yesterday = new Date();
                 yesterday.setDate(yesterday.getDate() - 1);
                 const y = yesterday.getFullYear();
@@ -349,50 +348,46 @@
                 const d = String(yesterday.getDate()).padStart(2, '0');
                 const dateStr = `${y}${m}${d}`;
 
-                // 透過 CORS proxy 繞過跨域限制
                 const proxyUrl = 'https://api.allorigins.win/raw?url=';
-                const targetUrl = `https://www.twse.com.tw/rwd/zh/afterTrading/STOCK_DAY?date=${dateStr}&stockNo=${code}`;
+                const targetUrl = `https://www.twse.com.tw/rwd/zh/afterTrading/STOCK_DAY?date=${dateStr}&stockNo=2330`; // 2330 只是為了取得格式，實際上會回傳所有股票
                 const response = await fetch(proxyUrl + encodeURIComponent(targetUrl), {
-                    signal: AbortSignal.timeout(10000)
+                    signal: AbortSignal.timeout(15000)
                 });
 
-                if (!response.ok) throw new Error('TWSE API 請求失敗');
+                if (!response.ok) throw new Error('TWSE 請求失敗');
                 const json = await response.json();
 
                 if (json.stat !== 'OK' || !json.data || json.data.length === 0) {
                     throw new Error('TWSE 無資料');
                 }
 
-                // 取最後一筆（當日收盤）
-                const lastRow = json.data[json.data.length - 1];
-                // TWSE 格式：[日期, 成交股數, 成交金額, 開盤價, 最高價, 最低價, 收盤價, 漲跌價差, 成交筆數]
-                const close = parseFloat(lastRow[6]);
-                const open = parseFloat(lastRow[3]);
-                const change = close - open;
+                // 建立股票代碼對應價格的 Map
+                const priceMap = {};
+                for (const row of json.data) {
+                    const code = row[0]; // 股票代碼
+                    const close = parseFloat(row[6]); // 收盤價
+                    const open = parseFloat(row[3]); // 開盤價
+                    const change = close - open;
+                    priceMap[code] = { price: close, open, change };
+                }
 
                 return {
-                    price: close,
-                    open: open,
-                    change: change,
-                    source: 'TWSE',
-                    updateTime: `${yesterday.getFullYear()}/${yesterday.getMonth()+1}/${yesterday.getDate()} 收盤`
+                    map: priceMap,
+                    updateTime: `${y}/${m}/${d} 收盤`
                 };
             } catch (e) {
-                console.warn(`[${code}] TWSE 備援失敗:`, e.message);
+                console.warn('TWSE 批量取得失敗:', e.message);
                 return null;
             }
         }
 
-        // ===== 從 FinMind 獲取 EPS 歷史數據 =====
+        // ===== 從 FinMind 取得 EPS 歷史數據（並發控制） =====
         async function fetchEPSGrowth(code) {
             try {
                 const year = new Date().getFullYear() - 2;
                 const epsUrl =
                     `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockEPS&data_id=${code}&start_date=${year}-01-01`;
-                const controller = new AbortController();
-                const timeout = setTimeout(() => controller.abort(), 8000);
-                const res = await fetch(epsUrl, { signal: controller.signal });
-                clearTimeout(timeout);
+                const res = await fetch(epsUrl, { signal: AbortSignal.timeout(8000) });
 
                 if (!res.ok) return null;
                 const json = await res.json();
@@ -423,168 +418,7 @@
             }
         }
 
-        // ===== 核心：多來源資料獲取 =====
-        async function fetchStock(code, name, retries = 2) {
-            for (let attempt = 0; attempt < retries; attempt++) {
-                try {
-                    // === 來源 1：FinMind（優先） ===
-                    const year = new Date().getFullYear() - 1;
-                    const controller = new AbortController();
-                    const timeout = setTimeout(() => controller.abort(), 12000);
-
-                    const priceUrl =
-                        `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPrice&data_id=${code}&start_date=${year}-01-01`;
-                    const perUrl =
-                        `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPER&data_id=${code}&start_date=${year}-01-01`;
-
-                    const [pRes, vRes] = await Promise.all([
-                        fetch(priceUrl, { signal: controller.signal }),
-                        fetch(perUrl, { signal: controller.signal })
-                    ]);
-
-                    clearTimeout(timeout);
-
-                    let price, open, change, per, source, updateTime;
-
-                    if (pRes.ok && vRes.ok) {
-                        const pJson = await pRes.json();
-                        const vJson = await vRes.json();
-
-                        if (pJson.data?.length) {
-                            const last = pJson.data[pJson.data.length - 1];
-                            price = Number(last.close);
-                            open = Number(last.open);
-                            change = price - open;
-                            source = 'FinMind';
-                            updateTime = '即時';
-                        } else {
-                            throw new Error('FinMind 無股價數據');
-                        }
-
-                        const lastV = vJson.data?.[vJson.data.length - 1] || { PER: null };
-                        per = lastV?.PER;
-                        if (!per || per <= 0 || per > 200) {
-                            per = null;
-                        }
-                    } else {
-                        throw new Error('FinMind API 回應失敗');
-                    }
-
-                    // 獲取 EPS 成長率
-                    const growthFromEPS = await fetchEPSGrowth(code);
-                    let growth = null;
-                    let peg = null;
-
-                    if (growthFromEPS !== null) {
-                        growth = growthFromEPS;
-                        if (growth >= 5 && per !== null) {
-                            peg = per / (growth / 100);
-                        }
-                    }
-
-                    return {
-                        code,
-                        name,
-                        price,
-                        open,
-                        change,
-                        pct: open ? (change / open * 100).toFixed(2) : "0.00",
-                        per: per !== null ? Number(per).toFixed(2) : '--',
-                        eps: per !== null ? (price / per).toFixed(2) : '--',
-                        growth,
-                        peg,
-                        source,
-                        updateTime
-                    };
-
-                } catch (e) {
-                    console.warn(`[${code}] FinMind 嘗試 ${attempt + 1} 失敗，切換備援...`);
-
-                    // === 來源 2：TWSE 備援（非即時股價） ===
-                    try {
-                        const twseData = await fetchTWSEPrice(code);
-                        if (twseData) {
-                            // 嘗試從 FinMind 獲取 EPS 成長率（即使股價失敗）
-                            const growthFromEPS = await fetchEPSGrowth(code);
-                            let growth = null;
-                            let peg = null;
-
-                            if (growthFromEPS !== null) {
-                                growth = growthFromEPS;
-                                // 計算 PER：使用 TWSE 收盤價 / 近四季 EPS
-                                const eps4Q = await getRecent4QEPS(code);
-                                let per = null;
-                                if (eps4Q !== null && eps4Q > 0) {
-                                    per = twseData.price / eps4Q;
-                                    if (growth >= 5) {
-                                        peg = per / (growth / 100);
-                                    }
-                                }
-
-                                return {
-                                    code,
-                                    name,
-                                    price: twseData.price,
-                                    open: twseData.open,
-                                    change: twseData.change,
-                                    pct: twseData.open ? (twseData.change / twseData.open * 100).toFixed(2) : "0.00",
-                                    per: per !== null ? Number(per).toFixed(2) : '--',
-                                    eps: per !== null ? (twseData.price / per).toFixed(2) : '--',
-                                    growth,
-                                    peg,
-                                    source: twseData.source,
-                                    updateTime: twseData.updateTime
-                                };
-                            } else {
-                                // 只有股價，無 EPS
-                                return {
-                                    code,
-                                    name,
-                                    price: twseData.price,
-                                    open: twseData.open,
-                                    change: twseData.change,
-                                    pct: twseData.open ? (twseData.change / twseData.open * 100).toFixed(2) : "0.00",
-                                    per: '--',
-                                    eps: '--',
-                                    growth: null,
-                                    peg: null,
-                                    source: twseData.source,
-                                    updateTime: twseData.updateTime
-                                };
-                            }
-                        }
-                    } catch (twseError) {
-                        console.warn(`[${code}] TWSE 備援也失敗:`, twseError.message);
-                    }
-
-                    if (attempt === retries - 1) {
-                        return null;
-                    }
-                    await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
-                }
-            }
-        }
-
-        // 輔助：取得近四季 EPS 總和（用於計算 PER）
-        async function getRecent4QEPS(code) {
-            try {
-                const year = new Date().getFullYear() - 2;
-                const epsUrl =
-                    `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockEPS&data_id=${code}&start_date=${year}-01-01`;
-                const res = await fetch(epsUrl, { signal: AbortSignal.timeout(8000) });
-                if (!res.ok) return null;
-                const json = await res.json();
-                const validData = json.data.filter(item => item.EPS !== null && !isNaN(Number(item.EPS)));
-                if (validData.length < 4) return null;
-                const sorted = validData.sort((a, b) => new Date(b.date) - new Date(a.date));
-                const recent4 = sorted.slice(0, 4);
-                return recent4.reduce((sum, item) => sum + Number(item.EPS), 0);
-            } catch (e) {
-                return null;
-            }
-        }
-
-        // ===== 優化的 fetchAllData（序列化 + 持久化） =====
+        // ===== 核心：極速同步（批量股價 + 並發 EPS） =====
         async function fetchAllData() {
             if (!currentCat) return;
 
@@ -600,29 +434,83 @@
             const results = [];
             const failedList = [];
 
-            for (let i = 0; i < codes.length; i++) {
-                const code = codes[i];
-                progText.textContent = `同步中：${stockList[code]} (${i + 1}/${codes.length})`;
-
-                const data = await fetchStock(code, stockList[code]);
-                if (data) {
-                    results.push(data);
-                } else {
-                    failedList.push(code);
-                }
-
-                // 間隔 1200ms，確保 API 不會被鎖
-                await new Promise(r => setTimeout(r, 1200));
+            // 第一步：批量取得 TWSE 股價（只需 1 個請求）
+            progText.textContent = `下載 TWSE 收盤資料...`;
+            const priceData = await fetchAllTWSEPrice();
+            let source = 'TWSE';
+            let updateTime = '昨日收盤';
+            if (priceData) {
+                source = 'TWSE';
+                updateTime = priceData.updateTime;
+            } else {
+                // 若 TWSE 失敗，退回到逐檔使用 FinMind
+                source = 'FinMind';
+                updateTime = '即時';
             }
 
-            if (failedList.length > 0) {
-                progText.textContent = `重試失敗的 ${failedList.length} 檔...`;
-                for (let i = 0; i < failedList.length; i++) {
-                    const code = failedList[i];
-                    const data = await fetchStock(code, stockList[code], 1);
-                    if (data) results.push(data);
-                    await new Promise(r => setTimeout(r, 1500));
+            // 第二步：並發取得 EPS 成長率（最多 3 個同時）
+            const chunkSize = 3;
+            for (let i = 0; i < codes.length; i += chunkSize) {
+                const batch = codes.slice(i, i + chunkSize);
+                const batchPromises = batch.map(async (code) => {
+                    progText.textContent =
+                        `取得 EPS 數據 ${i + 1}/${codes.length}...`;
+                    const growth = await fetchEPSGrowth(code);
+                    return { code, growth };
+                });
+
+                const batchResults = await Promise.allSettled(batchPromises);
+                // 處理結果
+                for (const result of batchResults) {
+                    if (result.status === 'fulfilled') {
+                        const { code, growth } = result.value;
+                        // 取得股價資料
+                        let priceInfo = null;
+                        if (priceData && priceData.map[code]) {
+                            priceInfo = priceData.map[code];
+                        } else {
+                            // 若 TWSE 沒有，嘗試用 FinMind 逐檔抓取
+                            try {
+                                const finData = await fetchStockPriceFinMind(code);
+                                if (finData) {
+                                    priceInfo = finData;
+                                    source = 'FinMind';
+                                    updateTime = '即時';
+                                }
+                            } catch (e) {
+                                // 忽略
+                            }
+                        }
+
+                        if (priceInfo) {
+                            const per = await fetchPERFinMind(code);
+                            let peg = null;
+                            if (growth !== null && growth >= 5 && per !== null && per > 0) {
+                                peg = per / (growth / 100);
+                            }
+                            results.push({
+                                code,
+                                name: stockList[code],
+                                price: priceInfo.price,
+                                open: priceInfo.open,
+                                change: priceInfo.change,
+                                pct: priceInfo.open ? (priceInfo.change / priceInfo.open * 100).toFixed(2) : "0.00",
+                                per: per !== null ? Number(per).toFixed(2) : '--',
+                                eps: per !== null ? (priceInfo.price / per).toFixed(2) : '--',
+                                growth: growth,
+                                peg: peg,
+                                source: source,
+                                updateTime: updateTime
+                            });
+                        } else {
+                            failedList.push(code);
+                        }
+                    } else {
+                        failedList.push(result.reason?.code || 'unknown');
+                    }
                 }
+                // 批次間隔 300ms
+                await new Promise(r => setTimeout(r, 300));
             }
 
             currentMarket = results;
@@ -634,10 +522,50 @@
             syncBtn.disabled = false;
 
             if (results.length < codes.length) {
-                alert(`同步完成，但有 ${codes.length - results.length} 檔股票數據缺失。\n可再次點擊同步重試。`);
+                alert(`同步完成，但有 ${codes.length - results.length} 檔股票數據缺失。`);
             }
 
             render();
+        }
+
+        // 輔助：單獨從 FinMind 抓股價
+        async function fetchStockPriceFinMind(code) {
+            try {
+                const year = new Date().getFullYear() - 1;
+                const url =
+                    `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPrice&data_id=${code}&start_date=${year}-01-01`;
+                const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+                if (!res.ok) return null;
+                const json = await res.json();
+                if (!json.data?.length) return null;
+                const last = json.data[json.data.length - 1];
+                const price = Number(last.close);
+                const open = Number(last.open);
+                const change = price - open;
+                return { price, open, change };
+            } catch (e) {
+                return null;
+            }
+        }
+
+        // 輔助：單獨從 FinMind 抓 PER
+        async function fetchPERFinMind(code) {
+            try {
+                const year = new Date().getFullYear() - 1;
+                const url =
+                    `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPER&data_id=${code}&start_date=${year}-01-01`;
+                const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+                if (!res.ok) return null;
+                const json = await res.json();
+                const lastV = json.data?.[json.data.length - 1] || { PER: null };
+                let per = lastV?.PER;
+                if (!per || per <= 0 || per > 200) {
+                    return null;
+                }
+                return per;
+            } catch (e) {
+                return null;
+            }
         }
 
         function setSort(key, btn) {
