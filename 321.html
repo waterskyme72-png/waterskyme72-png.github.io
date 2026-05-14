@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>台股 200 強價值監控 - FinMind 計算版</title>
+    <style>
+        :root {
+            --bg: #0d1117; --card: #161b22; --border: #30363d;
+            --text: #c9d1d9; --dim: #8b949e;
+            --up: #f85149; --down: #3fb950; --accent: #58a6ff;
+        }
+        * { box-sizing: border-box; }
+        body { margin:0; background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+
+        header {
+            padding:16px 24px; background:#010409; border-bottom:1px solid var(--border);
+            position:sticky; top:0; z-index:100;
+            display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;
+        }
+        .logo h1 { margin:0; color:var(--accent); font-size:1.2rem; }
+
+        .category-bar {
+            padding:12px 24px; background:var(--bg); border-bottom:1px solid var(--border);
+            display:flex; gap:8px; overflow-x:auto; align-items:center;
+        }
+        .c-btn {
+            background:#21262d; border:1px solid var(--border); color:var(--text);
+            padding:8px 14px; border-radius:6px; cursor:pointer; white-space:nowrap;
+            font-size:0.85rem; font-family:inherit;
+        }
+        .c-btn.active { background:var(--accent); color:white; border-color:var(--accent); font-weight:bold; }
+
+        .sync-area {
+            padding:10px 24px; display:flex; align-items:center; justify-content:space-between;
+            background:var(--card); border-bottom:1px solid var(--border); flex-wrap:wrap; gap:10px;
+        }
+        .btn-sync {
+            background:#238636; color:white; border:none; padding:8px 18px;
+            border-radius:6px; cursor:pointer; font-weight:bold; font-family:inherit; display:none;
+        }
+        .btn-sync:disabled { opacity:.5; cursor:not-allowed; }
+
+        .sort-bar {
+            padding:8px 24px; display:flex; gap:8px; overflow-x:auto;
+            border-bottom:1px solid var(--border); align-items:center;
+        }
+        .sbtn {
+            background:transparent; border:1px solid var(--border); color:var(--dim);
+            padding:4px 12px; border-radius:4px; cursor:pointer; font-size:0.75rem; font-family:inherit;
+        }
+        .sbtn.active { border-color:var(--accent); color:var(--accent); }
+
+        .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:16px; padding:20px; }
+
+        .card {
+            background:var(--card); border:1px solid var(--border); border-radius:12px;
+            padding:18px; transition:.2s; position:relative;
+        }
+        .card:hover { border-color:#8b949e; }
+
+        .card-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; }
+        .code { font-size:.8rem; color:var(--dim); font-family:monospace; }
+        .name { font-size:1.15rem; font-weight:800; color:white; margin-top:2px; }
+
+        .price-row { display:flex; align-items:baseline; gap:10px; margin-bottom:8px; }
+        .price  { font-size:2rem; font-weight:800; }
+        .change { font-size:1rem; font-weight:600; }
+        .up   { color:var(--up); }
+        .down { color:var(--down); }
+        .flat { color:var(--dim); }
+
+        .source-tag { font-size:.6rem; color:var(--dim); margin-bottom:10px; }
+        .source-tag span { background:#21262d; padding:2px 8px; border-radius:4px; border:1px solid var(--border); }
+
+        .peg-label {
+            padding:4px 10px; border-radius:6px; font-size:.7rem; font-weight:bold;
+            text-align:center; line-height:1.7;
+        }
+
+        /* EPS growth bar */
+        .bar-track { height:4px; background:#21262d; border-radius:2px; overflow:hidden; margin:10px 0 4px; }
+        .bar-fill  { height:100%; border-radius:2px; transition:width .5s; }
+        .bar-labels { display:flex; justify-content:space-between; font-size:.58rem; color:var(--dim); margin-bottom:10px; }
+
+        .value-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+        .v-box { background:#0d1117; padding:8px; border-radius:6px; }
+        .v-lbl { display:block; font-size:.6rem; color:var(--dim); margin-bottom:3px; }
+        .v-val { font-size:.9rem; font-weight:700; }
+
+        /* Loading overlay */
+        #loading {
+            position:fixed; inset:0; background:rgba(0,0,0,.88);
+            display:none; justify-content:center; align-items:center;
+            z-index:999; flex-direction:column;
+        }
+        .prog-outer { width:300px; height:6px; background:#21262d; border-radius:3px; margin-top:16px; overflow:hidden; }
+        .prog-inner { height:100%; background:var(--accent); border-radius:3px; transition:width .3s; }
+        .prog-text { color:white; margin-top:12px; font-size:.95rem; text-align:center; }
+        .prog-sub  { color:var(--dim); margin-top:6px; font-size:.78rem; text-align:center; }
+
+        @media(max-width:600px){
+            .search-box { width:140px !important; }
+            .sync-area  { flex-direction:column; gap:10px; text-align:center; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="loading">
+    <div style="font-size:2rem">🛰️</div>
+    <div class="prog-outer"><div class="prog-inner" id="progBar" style="width:0%"></div></div>
+    <div class="prog-text" id="progText">準備同步中...</div>
+    <div class="prog-sub"  id="progSub"></div>
+</div>
+
+<header>
+    <div class="logo">
+        <h1>台股價值監控 <small style="font-size:.7rem;color:var(--dim)">FinMind 計算版</small></h1>
+    </div>
+    <input type="text" id="searchInput" class="search-box"
+        style="background:#0d1117;border:1px solid var(--border);border-radius:6px;padding:8px;color:white;width:200px;"
+        placeholder="篩選當前結果…" oninput="render()">
+</header>
+
+<div class="category-bar">
+    <button class="c-btn" onclick="selectCat('semi')">半導體/IC</button>
+    <button class="c-btn" onclick="selectCat('ai')">AI/電腦週邊</button>
+    <button class="c-btn" onclick="selectCat('component')">電子零組件</button>
+    <button class="c-btn" onclick="selectCat('finance')">金融/保險</button>
+    <button class="c-btn" onclick="selectCat('old_heavy')">航運/鋼鐵/水泥</button>
+    <button class="c-btn" onclick="selectCat('plastic_chem')">塑化/紡織/生技</button>
+    <button class="c-btn" onclick="selectCat('power')">電機/重電/能源</button>
+    <button class="c-btn" onclick="selectCat('other')">通路/其他權值</button>
+</div>
+
+<div class="sync-area">
+    <div id="catDesc" style="font-size:.9rem;color:var(--accent)">👈 請選擇產業別並開始同步</div>
+    <div style="display:flex;gap:10px;align-items:center;">
+        <span id="updateTime" style="font-size:.8rem;color:var(--dim)"></span>
+        <button id="syncBtn" class="btn-sync" onclick="fetchAllData()">🚀 同步數據</button>
+    </div>
+</div>
+
+<div class="sort-bar">
+    <button class="sbtn active" onclick="setSort('price',this)">股價排序</button>
+    <button class="sbtn"        onclick="setSort('peg',this)">PEG 低→高</button>
+    <button class="sbtn"        onclick="setSort('growth',this)">EPS成長 高→低</button>
+    <button class="sbtn"        onclick="setSort('change',this)">漲跌幅</button>
+</div>
+
+<div id="mainGrid" class="grid"></div>
+
+<script>
+// ═══════════════════════════════════════════
+//  產業資料庫
+// ═══════════════════════════════════════════
+const CATEGORIES = {
+    semi:{ label:"半導體/IC設計", stocks:{
+        "2330":"台積電","2454":"聯發科","2303":"聯電","3711":"日月光投控","2449":"京元電子",
+        "3034":"聯詠","3443":"創意","3661":"世芯-KY","6415":"矽力-KY","6488":"環球晶",
+        "8046":"南電","2379":"瑞昱","3035":"智原","5269":"祥碩","5274":"信驊",
+        "6239":"力成","8299":"群聯","2337":"旺宏","2344":"華邦電","2408":"南亞科"
+    }},
+    ai:{ label:"AI/電腦週邊", stocks:{
+        "2317":"鴻海","2382":"廣達","2308":"台達電","3017":"奇鋐","6669":"緯穎",
+        "3231":"緯創","2357":"華碩","2376":"技嘉","2301":"光寶科","2353":"宏碁",
+        "2395":"研華","3008":"大立光","3044":"健鼎","3533":"嘉澤","4958":"臻鼎-KY",
+        "6213":"聯茂","2324":"仁寶","2356":"英業達","4938":"和碩"
+    }},
+    component:{ label:"電子零組件/光電", stocks:{
+        "2327":"國巨","3037":"欣興","2409":"友達","3481":"群創","2313":"華通",
+        "2360":"致茂","2367":"燿華","2368":"金像電","2421":"建準","2474":"可成",
+        "3019":"亞光","6153":"嘉聯益","6269":"台郡","6271":"同欣電","6278":"台表科","6409":"旭隼"
+    }},
+    finance:{ label:"金融/保險", stocks:{
+        "2881":"富邦金","2882":"國泰金","2884":"玉山金","2885":"元大金","2886":"兆豐金",
+        "2891":"中信金","5880":"合庫金","2880":"華南金","2883":"開發金","2887":"台新金",
+        "2890":"永豐金","2892":"第一金","5871":"中租-KY","5876":"上海商銀","2834":"臺企銀"
+    }},
+    old_heavy:{ label:"航運/鋼鐵/水泥", stocks:{
+        "2603":"長榮","2609":"陽明","2615":"萬海","2618":"長榮航","2610":"華航",
+        "2002":"中鋼","2014":"中鴻","2027":"大成鋼","1101":"台泥","1102":"亞泥",
+        "1216":"統一","9921":"巨大","2105":"正新"
+    }},
+    plastic_chem:{ label:"塑化/紡織/生技", stocks:{
+        "1301":"台塑","1303":"南亞","1326":"台化","6505":"台塑化",
+        "1795":"美時","6446":"藥華藥","1402":"遠東新","1476":"儒鴻",
+        "1477":"聚陽","9910":"豐泰","1707":"葡萄王"
+    }},
+    power:{ label:"電機/重電/能源", stocks:{
+        "1513":"中興電","1519":"華城","1503":"士電","1514":"亞力",
+        "1504":"東元","2049":"上銀","6806":"森崴能源","9933":"中鼎"
+    }},
+    other:{ label:"通路/其他權值", stocks:{
+        "2412":"中華電","4904":"遠傳","3045":"台灣大","2912":"統一超",
+        "8454":"富邦媒","2633":"高鐵","2347":"聯強","3702":"大聯大",
+        "3036":"文曄","2207":"和泰車"
+    }}
+};
+
+let currentCat  = null;
+let currentData = [];
+let sortKey     = 'price';
+
+// ═══════════════════════════════════════════
+//  快取
+// ═══════════════════════════════════════════
+function loadCache(id){ try{ const d=JSON.parse(localStorage.getItem('mv4_'+id)||'[]'); return Array.isArray(d)?d:[]; }catch{ return []; } }
+function saveCache(id,d){ try{ localStorage.setItem('mv4_'+id,JSON.stringify(d)); }catch{} }
+
+// ═══════════════════════════════════════════
+//  FinMind fetch wrapper
+// ═══════════════════════════════════════════
+async function finmind(dataset, code, startDate) {
+    const url = `https://api.finmindtrade.com/api/v4/data?dataset=${dataset}&data_id=${code}&start_date=${startDate}`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(12000) });
+    if (!res.ok) throw new Error('HTTP '+res.status);
+    const j = await res.json();
+    if (!Array.isArray(j.data)) throw new Error('no data');
+    return j.data;
+}
+
+// ═══════════════════════════════════════════
+//  單股資料抓取
+//  ★ 不使用 TaiwanStockEPS（免費額度不穩定）
+//  ★ 改由 Price ÷ PER 推導 EPS，再比較一年前推算成長率
+// ═══════════════════════════════════════════
+async function fetchStock(code, name) {
+    const y = new Date().getFullYear();
+    const START = `${y - 2}-01-01`;   // 2 年前，確保能計算 YoY
+
+    // 只用兩個確認可用的資料集
+    const [priceData, perData] = await Promise.all([
+        finmind('TaiwanStockPrice', code, START),
+        finmind('TaiwanStockPER',   code, START).catch(() => []),
+    ]);
+
+    if (!priceData.length) throw new Error('no price');
+
+    // ── 最新收盤 ──
+    const last    = priceData[priceData.length - 1];
+    const price   = Number(last.close);
+    const change  = Number(last.spread ?? 0);           // spread = 漲跌（與前日收盤差）
+    const prevCls = price - change;
+    const pct     = prevCls ? (change / prevCls * 100).toFixed(2) : '0.00';
+
+    // ── PER ──
+    let per    = null;
+    let epsNow = null;
+    let growth = null;
+    let peg    = null;
+
+    if (perData.length) {
+        const latestPer = Number(perData[perData.length - 1].PER);
+        if (latestPer > 0 && latestPer <= 300) {
+            per    = latestPer;
+            epsNow = Math.round(price / per * 100) / 100;   // EPS ≈ Price / PER
+        }
+
+        // ── EPS 年增率：比對「現在」vs「一年前」推導值 ──
+        const oneYrAgo = new Date();
+        oneYrAgo.setFullYear(oneYrAgo.getFullYear() - 1);
+        const yStr = oneYrAgo.toISOString().slice(0, 10);
+
+        const oldPerArr   = perData.filter(d => d.date <= yStr);
+        const oldPriceArr = priceData.filter(d => d.date <= yStr);
+
+        if (oldPerArr.length && oldPriceArr.length) {
+            const oldPer   = Number(oldPerArr[oldPerArr.length - 1].PER);
+            const oldPrice = Number(oldPriceArr[oldPriceArr.length - 1].close);
+
+            if (oldPer > 0 && oldPer <= 300 && oldPrice > 0 && epsNow !== null) {
+                const epsOld = oldPrice / oldPer;
+                if (epsOld > 0) {
+                    growth = Math.round((epsNow - epsOld) / epsOld * 1000) / 10;
+                } else if (epsNow > 0) {
+                    growth = 999;   // 虧轉盈
+                }
+            }
+        }
+
+        // ── PEG = PE ÷ 成長率(%) ──
+        if (per !== null && growth !== null && growth > 0 && growth < 999) {
+            peg = Math.round(per / growth * 100) / 100;
+        }
+    }
+
+    return { code, name, price, change, pct, per, eps: epsNow, growth, peg, source:'FinMind' };
+}
+
+// ═══════════════════════════════════════════
+//  選擇分類
+// ═══════════════════════════════════════════
+function selectCat(id) {
+    currentCat = id;
+    document.querySelectorAll('.c-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector(`button[onclick="selectCat('${id}')"]`).classList.add('active');
+    document.getElementById('catDesc').textContent =
+        `${CATEGORIES[id].label}（${Object.keys(CATEGORIES[id].stocks).length} 檔）`;
+    document.getElementById('syncBtn').style.display = 'block';
+
+    currentData = loadCache(id);
+    if (currentData.length) {
+        document.getElementById('updateTime').textContent = '來自快取，可重新同步';
+        render();
+    } else {
+        fetchAllData();
+    }
+}
+
+// ═══════════════════════════════════════════
+//  批次同步
+// ═══════════════════════════════════════════
+async function fetchAllData() {
+    if (!currentCat) return;
+    const stocks  = CATEGORIES[currentCat].stocks;
+    const codes   = Object.keys(stocks);
+    const syncBtn = document.getElementById('syncBtn');
+    const loading = document.getElementById('loading');
+
+    loading.style.display = 'flex';
+    syncBtn.disabled = true;
+    document.getElementById('progBar').style.width = '0%';
+
+    const results = [], failed = [];
+    const CHUNK = 3, DELAY = 500;
+
+    for (let i = 0; i < codes.length; i += CHUNK) {
+        const batch = codes.slice(i, i + CHUNK);
+        document.getElementById('progText').textContent =
+            `同步中 (${Math.min(i + CHUNK, codes.length)} / ${codes.length})`;
+        document.getElementById('progSub').textContent =
+            batch.map(c => stocks[c]).join('、');
+        document.getElementById('progBar').style.width =
+            `${Math.round(i / codes.length * 100)}%`;
+
+        const settled = await Promise.allSettled(
+            batch.map(c => fetchStock(c, stocks[c]))
+        );
+        settled.forEach((r, idx) => {
+            if (r.status === 'fulfilled') results.push(r.value);
+            else { console.warn(batch[idx], r.reason?.message); failed.push(stocks[batch[idx]]); }
+        });
+
+        if (i + CHUNK < codes.length) await new Promise(r => setTimeout(r, DELAY));
+    }
+
+    document.getElementById('progBar').style.width = '100%';
+    currentData = results;
+    saveCache(currentCat, results);
+
+    const t = new Date().toLocaleTimeString('zh-TW', { hour12:false });
+    document.getElementById('updateTime').textContent =
+        `更新：${t}（${results.length} 檔成功${failed.length ? `，${failed.length} 檔失敗` : ''}）`;
+
+    loading.style.display = 'none';
+    syncBtn.disabled = false;
+    render();
+}
+
+// ═══════════════════════════════════════════
+//  排序
+// ═══════════════════════════════════════════
+function setSort(key, btn) {
+    sortKey = key;
+    document.querySelectorAll('.sbtn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    render();
+}
+
+// ═══════════════════════════════════════════
+//  渲染
+// ═══════════════════════════════════════════
+function pegMeta(p) {
+    if (p === null || p === undefined) return { color:'#8b949e', label:'無法計算' };
+    if (p < 0.8)  return { color:'#3fb950', label:'低估 🟢' };
+    if (p < 1.2)  return { color:'#58a6ff', label:'合理' };
+    if (p < 2.0)  return { color:'#fbbf24', label:'偏貴' };
+    return              { color:'#f85149', label:'過貴 🔴' };
+}
+function gColor(g) {
+    if (g === null) return '#8b949e';
+    if (g >= 50)  return '#3fb950';
+    if (g >= 20)  return '#58a6ff';
+    if (g >= 0)   return '#fbbf24';
+    return '#f85149';
+}
+
+function render() {
+    const grid  = document.getElementById('mainGrid');
+    const query = document.getElementById('searchInput').value.toLowerCase();
+
+    let list = currentData.filter(s =>
+        s.code.includes(query) || s.name.toLowerCase().includes(query)
+    );
+
+    list.sort((a, b) => {
+        if (sortKey === 'peg')    return (a.peg    ?? 9999)  - (b.peg    ?? 9999);
+        if (sortKey === 'growth') return (b.growth ?? -9999) - (a.growth ?? -9999);
+        if (sortKey === 'change') return parseFloat(b.pct)   - parseFloat(a.pct);
+        return b.price - a.price;
+    });
+
+    if (!list.length) {
+        grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:80px;color:var(--dim)">
+            ${currentCat ? '找不到符合條件' : '👈 請選擇產業別並開始同步'}
+        </div>`;
+        return;
+    }
+
+    grid.innerHTML = list.map(s => {
+        const isUp = s.change > 0, isDn = s.change < 0;
+        const cc   = isUp ? 'up' : isDn ? 'down' : 'flat';
+        const ar   = isUp ? '▲' : isDn ? '▼' : '';
+        const pm   = pegMeta(s.peg);
+        const gc   = gColor(s.growth);
+
+        const growthTxt = s.growth === 999 ? '虧轉盈 🔄' :
+                          s.growth != null  ? (s.growth > 0 ? '+' : '') + s.growth.toFixed(1) + '%' : '—';
+        const barW = s.growth != null && s.growth !== 999
+            ? Math.min(Math.max(s.growth, 0), 200) / 2   // 0–200% → 0–100px
+            : 0;
+
+        return `
+        <div class="card">
+            <div class="card-header">
+                <div>
+                    <div class="code">${s.code}</div>
+                    <div class="name">${s.name}</div>
+                </div>
+                <div class="peg-label" style="background:${pm.color}18;color:${pm.color};border:1px solid ${pm.color}40">
+                    PEG ${s.peg != null ? s.peg.toFixed(2) : 'N/A'}<br>
+                    <span style="font-size:.6rem">${pm.label}</span>
+                </div>
+            </div>
+
+            <div class="price-row">
+                <div class="price ${cc}">${s.price.toFixed(1)}</div>
+                <div class="change ${cc}">${ar}${Math.abs(s.change).toFixed(1)} (${s.pct}%)</div>
+            </div>
+
+            <div class="source-tag"><span>📡 FinMind EOD · EPS 由 Price÷PER 推導</span></div>
+
+            <div class="bar-track">
+                <div class="bar-fill" style="width:${barW}%;background:${gc}"></div>
+            </div>
+            <div class="bar-labels">
+                <span>EPS 年增率</span>
+                <span style="color:${gc};font-weight:700">${growthTxt}</span>
+            </div>
+
+            <div class="value-grid">
+                <div class="v-box">
+                    <span class="v-lbl">推導 EPS (TTM)</span>
+                    <span class="v-val">${s.eps != null ? '$' + s.eps.toFixed(2) : '—'}</span>
+                </div>
+                <div class="v-box">
+                    <span class="v-lbl">本益比 PER</span>
+                    <span class="v-val">${s.per != null ? s.per.toFixed(1) + 'x' : '—'}</span>
+                </div>
+                <div class="v-box">
+                    <span class="v-lbl">EPS 年增率</span>
+                    <span class="v-val" style="color:${gc}">${growthTxt}</span>
+                </div>
+                <div class="v-box">
+                    <span class="v-lbl">PEG = PE ÷ 增率</span>
+                    <span class="v-val" style="color:${pm.color}">${s.peg != null ? s.peg.toFixed(2) : '—'}</span>
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+}
+</script>
+</body>
+</html>
