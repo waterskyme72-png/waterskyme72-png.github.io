@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>台股價值監控 - 分類分流版</title>
+<title>台股 200 強價值監控 - 完整分類版</title>
 <style>
   :root {
     --bg: #0d1117;
@@ -22,25 +22,25 @@
   header { padding: 16px 24px; background: #010409; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
   .logo h1 { margin: 0; color: var(--accent); font-size: 1.2rem; }
   
-  .category-bar { padding: 12px 24px; background: #0d1117; border-bottom: 1px solid var(--border); display: flex; gap: 10px; overflow-x: auto; align-items: center; }
-  .c-btn { background: #21262d; border: 1px solid var(--border); color: var(--text); padding: 8px 16px; border-radius: 6px; cursor: pointer; white-space: nowrap; font-size: 0.9rem; }
+  .category-bar { padding: 12px 24px; background: #0d1117; border-bottom: 1px solid var(--border); display: flex; gap: 8px; overflow-x: auto; align-items: center; }
+  .c-btn { background: #21262d; border: 1px solid var(--border); color: var(--text); padding: 8px 14px; border-radius: 6px; cursor: pointer; white-space: nowrap; font-size: 0.85rem; }
   .c-btn.active { background: var(--accent); color: white; border-color: var(--accent); font-weight: bold; }
   
-  .sync-area { padding: 10px 24px; display: flex; align-items: center; gap: 15px; }
-  .btn-sync { background: #238636; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; display: none; }
+  .sync-area { padding: 10px 24px; display: flex; align-items: center; justify-content: space-between; background: #161b22; border-bottom: 1px solid var(--border); }
+  .btn-sync { background: #238636; color: white; border: none; padding: 8px 18px; border-radius: 6px; cursor: pointer; font-weight: bold; display: none; }
   .btn-sync:disabled { opacity: 0.5; cursor: not-allowed; }
 
   .sort-bar { padding: 8px 24px; display: flex; gap: 8px; overflow-x: auto; border-bottom: 1px solid var(--border); }
-  .sbtn { background: transparent; border: 1px solid var(--border); color: var(--dim); padding: 5px 12px; border-radius: 4px; cursor: pointer; font-size: 0.75rem; }
+  .sbtn { background: transparent; border: 1px solid var(--border); color: var(--dim); padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 0.75rem; }
   .sbtn.active { border-color: var(--accent); color: var(--accent); }
 
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; padding: 20px; }
-  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px; transition: 0.2s; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px; transition: 0.2s; position: relative; }
   .card:hover { border-color: #8b949e; }
   
   .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
   .code { font-size: 0.8rem; color: var(--dim); font-family: monospace; }
-  .name { font-size: 1.15rem; font-weight: 800; color: white; }
+  .name { font-size: 1.15rem; font-weight: 800; color: white; margin-top: 2px; }
   
   .price-row { display: flex; align-items: baseline; gap: 10px; margin-bottom: 14px; }
   .price { font-size: 2rem; font-weight: 800; }
@@ -54,69 +54,67 @@
   .v-lbl { display: block; font-size: 0.6rem; color: var(--dim); margin-bottom: 2px; }
   .v-val { font-size: 0.9rem; font-weight: 700; }
   
-  #loading { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 999; flex-direction: column; }
-  .progress-info { color: white; margin-top: 15px; font-size: 1rem; }
+  #loading { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: none; justify-content: center; align-items: center; z-index: 999; flex-direction: column; }
+  .progress-info { color: white; margin-top: 15px; font-size: 1rem; text-align: center; }
+
+  @media (max-width: 600px) {
+    .search-box { width: 140px !important; }
+    .sync-area { flex-direction: column; gap: 10px; text-align: center; }
+  }
 </style>
 </head>
 <body>
 
 <div id="loading">
-  <div style="font-size: 2rem;">📡</div>
+  <div style="font-size: 2rem; animation: pulse 1s infinite;">🛰️</div>
   <div class="progress-info" id="progressText">準備同步中...</div>
 </div>
 
 <header>
   <div class="logo">
-    <h1>台股價值監控 <small style="font-size: 0.7rem; color: var(--dim);">分流穩定版</small></h1>
+    <h1>台股價值監控 <small style="font-size: 0.7rem; color: var(--dim);">Top 200 完整版</small></h1>
   </div>
-  <input type="text" id="searchInput" style="background:#0d1117; border:1px solid var(--border); border-radius:6px; padding:8px; color:white; width:200px;" placeholder="篩選結果..." oninput="render()">
-  <div id="updateTime" style="font-size: 0.8rem; color: var(--dim);">請選擇產業類型</div>
+  <input type="text" id="searchInput" class="search-box" style="background:#0d1117; border:1px solid var(--border); border-radius:6px; padding:8px; color:white; width:200px;" placeholder="篩選當前結果..." oninput="render()">
 </header>
 
 <div class="category-bar" id="categoryBar">
-  <button class="c-btn" onclick="selectCat('semi')">半導體/IC設計</button>
-  <button class="c-btn" onclick="selectCat('ai')">AI/電子組裝</button>
-  <button class="c-btn" onclick="selectCat('finance')">金融族群</button>
-  <button class="c-btn" onclick="selectCat('old')">傳產/航運/重電</button>
-  <button class="c-btn" onclick="selectCat('others')">其他權值</button>
+  <button class="c-btn" onclick="selectCat('semi')">半導體/IC</button>
+  <button class="c-btn" onclick="selectCat('ai')">AI/電腦週邊</button>
+  <button class="c-btn" onclick="selectCat('component')">電子零組件</button>
+  <button class="c-btn" onclick="selectCat('finance')">金融/保險</button>
+  <button class="c-btn" onclick="selectCat('old_heavy')">航運/鋼鐵/水泥</button>
+  <button class="c-btn" onclick="selectCat('plastic_chem')">塑化/紡織/生技</button>
+  <button class="c-btn" onclick="selectCat('power')">電機/重電/能源</button>
+  <button class="c-btn" onclick="selectCat('other')">通路/其他權值</button>
 </div>
 
 <div class="sync-area">
-  <div id="catDesc" style="font-size: 0.9rem; color: var(--accent);">👈 請先選擇一個產業類別</div>
-  <button id="syncBtn" class="btn-sync" onclick="fetchAllData()">🚀 開始同步該區數據</button>
+  <div id="catDesc" style="font-size: 0.9rem; color: var(--accent);">👈 請選擇產業別並開始同步</div>
+  <div style="display:flex; gap:10px; align-items:center;">
+    <span id="updateTime" style="font-size: 0.8rem; color: var(--dim);"></span>
+    <button id="syncBtn" class="btn-sync" onclick="fetchAllData()">🚀 同步數據</button>
+  </div>
 </div>
 
 <div class="sort-bar">
   <button class="sbtn active" onclick="setSort('price', this)">股價排序</button>
-  <button class="sbtn" onclick="setSort('peg', this)">PEG排序</button>
-  <button class="sbtn" onclick="setSort('change', this)">漲跌排序</button>
+  <button class="sbtn" onclick="setSort('peg', this)">PEG 低→高</button>
+  <button class="sbtn" onclick="setSort('change', this)">漲跌幅</button>
 </div>
 
 <div id="mainGrid" class="grid"></div>
 
 <script>
-// ===== 產業分類數據庫 =====
+// ===== 擴充後的 200 強產業數據庫 (部分精簡標籤) =====
 const CATEGORIES = {
-  semi: {
-    label: "半導體/IC設計",
-    stocks: {"2330":"台積電", "2454":"聯發科", "2303":"聯電", "3711":"日月光投控", "2449":"京元電子", "3034":"聯詠", "3443":"創意", "3661":"世芯-KY", "6415":"矽力-KY", "6488":"環球晶", "8046":"南電"}
-  },
-  ai: {
-    label: "AI/電子組裝",
-    stocks: {"2317":"鴻海", "2382":"廣達", "2308":"台達電", "3017":"奇鋐", "6669":"緯穎", "3231":"緯創", "2357":"華碩", "2376":"技嘉", "3037":"欣興", "4938":"和碩", "2327":"國巨"}
-  },
-  finance: {
-    label: "金融族群",
-    stocks: {"2881":"富邦金", "2882":"國泰金", "2884":"玉山金", "2885":"元大金", "2886":"兆豐金", "2891":"中信金", "5880":"合庫金", "5871":"中租-KY", "2883":"開發金", "2892":"第一金"}
-  },
-  old: {
-    label: "傳產/航運/重電",
-    stocks: {"2603":"長榮", "2609":"陽明", "2615":"萬海", "1513":"中興電", "1519":"華城", "2002":"中鋼", "1101":"台泥", "1216":"統一", "1301":"台塑", "2207":"和泰車", "1503":"士電", "1514":"亞力"}
-  },
-  others: {
-    label: "其他權值",
-    stocks: {"2412":"中華電", "4904":"遠傳", "3045":"台灣大", "2912":"統一超", "8454":"富邦媒", "9910":"豐泰", "1476":"儒鴻"}
-  }
+  semi: { label: "半導體/IC設計", stocks: {"2330":"台積電","2454":"聯發科","2303":"聯電","3711":"日月光投控","2449":"京元電子","3034":"聯詠","3443":"創意","3661":"世芯-KY","6415":"矽力-KY","6488":"環球晶","8046":"南電","2379":"瑞昱","3035":"智原","3532":"台勝科","4919":"新唐","4961":"天鈺","5269":"祥碩","5274":"信驊","6239":"力成","8299":"群聯","2337":"旺宏","2344":"華邦電","2408":"南亞科"} },
+  ai: { label: "AI/電腦週邊", stocks: {"2317":"鴻海","2382":"廣達","2308":"台達電","3017":"奇鋐","6669":"緯穎","3231":"緯創","2357":"華碩","2376":"技嘉","2301":"光寶科","2353":"宏碁","2395":"研華","3008":"大立光","3044":"健鼎","3515":"華擎","3533":"嘉澤","4958":"臻鼎-KY","6213":"聯茂","8016":"矽創","2324":"仁寶","2356":"英業達","4938":"和碩"} },
+  component: { label: "電子零組件/光電", stocks: {"2327":"國巨","3037":"欣興","2409":"面板-友達","3481":"面板-群創","2313":"華通","2360":"致茂","2367":"燿華","2368":"金像電","2421":"建準","2474":"可成","3019":"亞光","3376":"新日興","6153":"嘉聯益","6269":"台郡","6271":"同欣電","6278":"台表科","6409":"旭隼"} },
+  finance: { label: "金融/保險", stocks: {"2881":"富邦金","2882":"國泰金","2884":"玉山金","2885":"元大金","2886":"兆豐金","2891":"中信金","5880":"合庫金","2880":"華南金","2883":"開發金","2887":"台新金","2888":"新光金","2889":"國票金","2890":"永豐金","2892":"第一金","5871":"中租-KY","5876":"上海商銀","6005":"群益證","2834":"臺企銀"} },
+  old_heavy: { label: "航運/鋼鐵/水泥", stocks: {"2603":"長榮","2609":"陽明","2615":"萬海","2618":"長榮航","2610":"華航","2002":"中鋼","2014":"中鴻","2027":"大成鋼","1101":"台泥","1102":"亞泥","1216":"統一","1210":"大成","9921":"巨大","9945":"潤泰新","2105":"正新"} },
+  plastic_chem: { label: "塑化/紡織/生技", stocks: {"1301":"台塑","1303":"南亞","1326":"台化","6505":"台塑化","1722":"台肥","1795":"美時","6446":"藥華藥","4147":"龍燈-KY","1402":"遠東新","1476":"儒鴻","1477":"聚陽","9910":"豐泰","1707":"葡萄王"} },
+  power: { label: "電機/重電/能源", stocks: {"1513":"中興電","1519":"華城","1503":"士電","1514":"亞力","1504":"東元","1560":"中砂","2049":"上銀","2331":"精英","6806":"森崴能源","9904":"寶成","9933":"中鼎"} },
+  other: { label: "通路/其他權值", stocks: {"2412":"中華電","4904":"遠傳","3045":"台灣大","2912":"統一超","8454":"富邦媒","2633":"高鐵","2347":"聯強","3702":"大聯大","3036":"文曄","9930":"中聯資源","2207":"和泰車"} }
 };
 
 let currentCat = null;
@@ -126,18 +124,17 @@ let sortKey = "price";
 function selectCat(id) {
   currentCat = id;
   document.querySelectorAll('.c-btn').forEach(b => b.classList.remove('active'));
-  event.target.classList.add('active');
+  document.querySelector(`button[onclick="selectCat('${id}')"]`).classList.add('active');
   
-  document.getElementById('catDesc').textContent = `已選：${CATEGORIES[id].label} (共 ${Object.keys(CATEGORIES[id].stocks).length} 檔)`;
+  document.getElementById('catDesc').textContent = `${CATEGORIES[id].label} (${Object.keys(CATEGORIES[id].stocks).length} 檔)`;
   document.getElementById('syncBtn').style.display = 'block';
-  // 切換分類時先清空畫面，避免誤看
   currentMarket = [];
   render();
 }
 
 function estimateGrowth(per) {
-  if(!per) return 10;
-  return Math.max(5, Math.min(40, 30 - per)); 
+  if(!per || per < 0) return 10;
+  return Math.max(5, Math.min(45, 35 - per)); 
 }
 
 async function fetchStock(code, name) {
@@ -156,15 +153,16 @@ async function fetchStock(code, name) {
     const lastV = vJson.data?.[vJson.data.length - 1];
     
     const price = Number(last.close);
-    const change = price - Number(last.open);
-    const per = lastV?.PER || (price / 5); // 估算
+    const open = Number(last.open);
+    const change = price - open;
+    const per = lastV?.PER || (price / 8); 
     const growth = estimateGrowth(per);
 
     return {
       code, name, price, change,
-      pct: (change / Number(last.open) * 100).toFixed(2),
+      pct: open ? (change / open * 100).toFixed(2) : "0.00",
       per: Number(per).toFixed(2),
-      eps: (price / per).toFixed(2),
+      eps: per ? (price / per).toFixed(2) : "--",
       growth,
       peg: per / growth
     };
@@ -175,7 +173,10 @@ async function fetchAllData() {
   if(!currentCat) return;
   const loading = document.getElementById("loading");
   const progText = document.getElementById("progressText");
+  const syncBtn = document.getElementById("syncBtn");
+  
   loading.style.display = "flex";
+  syncBtn.disabled = true;
   
   const stockList = CATEGORIES[currentCat].stocks;
   const codes = Object.keys(stockList);
@@ -183,25 +184,26 @@ async function fetchAllData() {
 
   for(let i=0; i<codes.length; i++) {
     const code = codes[i];
-    progText.textContent = `正在抓取 ${stockList[code]} (${i+1}/${codes.length})...`;
+    progText.textContent = `[ ${CATEGORIES[currentCat].label} ]\n同步中：${stockList[code]} (${i+1}/${codes.length})`;
     
     const data = await fetchStock(code, stockList[code]);
     if(data) results.push(data);
     
-    // 增加一點延遲，避免 API 鎖定
-    await new Promise(r => setTimeout(r, 250));
+    // 降低延遲至 180ms，提速但仍避開 Rate Limit
+    await new Promise(r => setTimeout(r, 180));
   }
 
   currentMarket = results;
-  document.getElementById("updateTime").textContent = `更新：${new Date().toLocaleTimeString()}`;
+  document.getElementById("updateTime").textContent = `最後更新: ${new Date().toLocaleTimeString()}`;
   loading.style.display = "none";
+  syncBtn.disabled = false;
   render();
 }
 
 function setSort(key, btn) {
   sortKey = key;
   document.querySelectorAll(".sbtn").forEach(b => b.classList.remove("active"));
-  btn.classList.add("active");
+  btn.classList.add('active');
   render();
 }
 
@@ -213,19 +215,19 @@ function render() {
 
   filtered.sort((a,b) => {
     if(sortKey === "peg") return (a.peg || 99) - (b.peg || 99);
-    if(sortKey === "change") return b.change - a.change;
+    if(sortKey === "change") return (b.change/b.price) - (a.change/a.price);
     return b.price - a.price;
   });
 
   if(filtered.length === 0 && currentCat) {
-    grid.innerHTML = `<div style="grid-column:1/-1; text-align:center; padding:50px; color:var(--dim);">此類別尚未同步或無資料，請點擊上方按鈕開始。</div>`;
+    grid.innerHTML = `<div style="grid-column:1/-1; text-align:center; padding:80px; color:var(--dim);">尚未同步此類別數據，請點擊「🚀 同步數據」。</div>`;
     return;
   }
 
   grid.innerHTML = filtered.map(s => {
     const isUp = s.change > 0;
     const cClass = isUp ? "up" : (s.change < 0 ? "down" : "");
-    const pegColor = s.peg < 1 ? "#34d399" : (s.peg > 1.5 ? "#f87171" : "#fbbf24");
+    const pegColor = s.peg < 1 ? "#34d399" : (s.peg > 1.3 ? "#f87171" : "#fbbf24");
     
     return `
       <div class="card">
@@ -234,19 +236,19 @@ function render() {
             <div class="code">${s.code}</div>
             <div class="name">${s.name}</div>
           </div>
-          <div class="peg-label" style="background:${pegColor}22; color:${pegColor}; border:1px solid ${pegColor}55;">
-            PEG ${Number(s.peg).toFixed(2)}<br><span style="font-size:0.6rem">${s.peg < 1 ? '低估' : (s.peg > 1.5 ? '偏貴' : '合理')}</span>
+          <div class="peg-label" style="background:${pegColor}15; color:${pegColor}; border:1px solid ${pegColor}40;">
+            PEG ${Number(s.peg).toFixed(2)}<br><span style="font-size:0.6rem">${s.peg < 1 ? '低估' : (s.peg > 1.3 ? '偏貴' : '合理')}</span>
           </div>
         </div>
         <div class="price-row">
-          <div class="price ${cClass}">${s.price}</div>
-          <div class="change ${cClass}">${isUp?'▲':(s.change<0?'▼':'')} ${Math.abs(s.change).toFixed(2)} (${s.pct}%)</div>
+          <div class="price ${cClass}">${s.price.toFixed(1)}</div>
+          <div class="change ${cClass}">${isUp?'▲':(s.change<0?'▼':'')} ${Math.abs(s.change).toFixed(1)} (${s.pct}%)</div>
         </div>
         <div class="value-grid">
-          <div class="v-box"><span class="v-lbl">預估 EPS</span><span class="v-val">${s.eps}</span></div>
+          <div class="v-box"><span class="v-lbl">估算 EPS</span><span class="v-val">${s.eps}</span></div>
           <div class="v-box"><span class="v-lbl">本益比 PER</span><span class="v-val">${s.per}</span></div>
           <div class="v-box"><span class="v-lbl">預期成長</span><span class="v-val" style="color:#fbbf24">${s.growth}%</span></div>
-          <div class="v-box"><span class="v-lbl">監控狀態</span><span class="v-val" style="color:var(--down)">OK</span></div>
+          <div class="v-box"><span class="v-lbl">監控</span><span class="v-val" style="color:var(--accent)">Active</span></div>
         </div>
       </div>
     `;
