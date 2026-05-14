@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>台股 200 強價值監控 - 直接撈取版</title>
+    <title>台股 200 強價值監控 - FinMind 計算版</title>
     <style>
         :root {
             --bg: #0d1117;
@@ -250,7 +250,7 @@
 
     <header>
         <div class="logo">
-            <h1>台股價值監控 <small style="font-size: 0.7rem; color: var(--dim);">直接撈取版</small></h1>
+            <h1>台股價值監控 <small style="font-size: 0.7rem; color: var(--dim);">FinMind 計算版</small></h1>
         </div>
         <input type="text" id="searchInput" class="search-box" style="background:#0d1117; border:1px solid var(--border); border-radius:6px; padding:8px; color:white; width:200px;" placeholder="篩選當前結果..." oninput="render()">
     </header>
@@ -338,26 +338,7 @@
             }
         }
 
-        // ===== 從 Yahoo Finance 直接撈取 PEG =====
-        async function fetchYahooPEG(code) {
-            try {
-                const symbol = `${code}.TW`;
-                const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbol}`;
-                const response = await fetch(url, { signal: AbortSignal.timeout(8000) });
-                if (!response.ok) return null;
-                const json = await response.json();
-                const quote = json.quoteResponse?.result?.[0];
-                if (!quote) return null;
-                // 直接取 pegRatio（可能為 null）
-                const peg = quote.pegRatio;
-                return peg !== null && peg !== undefined ? peg : null;
-            } catch (e) {
-                console.warn(`[${code}] Yahoo PEG 撈取失敗:`, e.message);
-                return null;
-            }
-        }
-
-        // ===== 從 FinMind 撈取近四季 EPS 總和 =====
+        // ===== 從 FinMind 獲取近四季 EPS 總和 =====
         async function fetchEPS4Q(code) {
             try {
                 const year = new Date().getFullYear() - 2;
@@ -367,8 +348,10 @@
                 if (!res.ok) return null;
                 const json = await res.json();
                 const validData = json.data.filter(item => item.EPS !== null && item.EPS !== undefined && !isNaN(Number(item.EPS)));
-                if (validData.length < 4) return null;
+                if (validData.length < 8) return null; // 需要至少 8 季才能計算年增率
                 const sorted = validData.sort((a, b) => new Date(b.date) - new Date(a.date));
+                
+                // 近四季 (index 0~3)
                 const recent4 = sorted.slice(0, 4);
                 const sum = recent4.reduce((s, item) => s + Number(item.EPS), 0);
                 return Math.round(sum * 100) / 100;
@@ -378,7 +361,34 @@
             }
         }
 
-        // ===== 從 FinMind 撈取股價與 PER =====
+        // ===== 從 FinMind 獲取 EPS 年增率（用於計算 PEG） =====
+        async function fetchEPSGrowth(code) {
+            try {
+                const year = new Date().getFullYear() - 2;
+                const epsUrl =
+                    `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockEPS&data_id=${code}&start_date=${year}-01-01`;
+                const res = await fetch(epsUrl, { signal: AbortSignal.timeout(8000) });
+                if (!res.ok) return null;
+                const json = await res.json();
+                const validData = json.data.filter(item => item.EPS !== null && !isNaN(Number(item.EPS)));
+                if (validData.length < 8) return null;
+                const sorted = validData.sort((a, b) => new Date(b.date) - new Date(a.date));
+                const recent = sorted.slice(0, 8);
+                const epsRecent4 = recent.slice(0, 4).reduce((s, item) => s + Number(item.EPS), 0);
+                const epsLast4 = recent.slice(4, 8).reduce((s, item) => s + Number(item.EPS), 0);
+                if (epsLast4 === 0) {
+                    if (epsRecent4 > 0) return 999; // 轉盈
+                    return null;
+                }
+                let growth = (epsRecent4 - epsLast4) / Math.abs(epsLast4) * 100;
+                return Math.round(growth * 10) / 10;
+            } catch (e) {
+                console.warn(`[${code}] 成長率計算失敗:`, e.message);
+                return null;
+            }
+        }
+
+        // ===== 從 FinMind 獲取股價與 PER =====
         async function fetchStockPriceAndPER(code) {
             try {
                 const year = new Date().getFullYear() - 1;
@@ -423,15 +433,15 @@
             }
         }
 
-        // ===== 核心：直接撈取 PEG + EPS（不計算） =====
+        // ===== 核心：撈取與計算 =====
         async function fetchStock(code, name, retries = 2) {
             for (let attempt = 0; attempt < retries; attempt++) {
                 try {
-                    // 同時撈取：股價、PER、EPS4Q、PEG
-                    const [pricePerData, eps4q, peg] = await Promise.all([
+                    // 同時撈取：股價+PER、EPS 總和、EPS 成長率
+                    const [pricePerData, eps4q, growth] = await Promise.all([
                         fetchStockPriceAndPER(code),
                         fetchEPS4Q(code),
-                        fetchYahooPEG(code)
+                        fetchEPSGrowth(code)
                     ]);
 
                     if (!pricePerData) {
@@ -439,6 +449,12 @@
                     }
 
                     const { price, open, change, per } = pricePerData;
+
+                    // 計算 PEG (只有當 PER 和 Growth 都有有效值時)
+                    let peg = null;
+                    if (per !== null && growth !== null && growth >= 5) {
+                        peg = per / (growth / 100);
+                    }
 
                     return {
                         code,
@@ -450,7 +466,7 @@
                         per: per !== null ? Number(per).toFixed(2) : '--',
                         eps: eps4q !== null ? eps4q.toFixed(2) : '--',
                         peg: peg !== null ? Number(peg).toFixed(2) : null,
-                        source: peg !== null ? 'Yahoo' : 'FinMind',
+                        source: 'FinMind',
                         updateTime: '即時'
                     };
 
@@ -570,7 +586,7 @@
                 } else {
                     pegDisplay = "N/A";
                     pegColor = "#8b949e";
-                    pegStatus = "無數據";
+                    pegStatus = "計算失敗";
                 }
 
                 return `
@@ -589,7 +605,7 @@
                   <div class="change ${cClass}">${isUp ? '▲' : (s.change < 0 ? '▼' : '')} ${Math.abs(s.change).toFixed(1)} (${s.pct}%)</div>
                 </div>
                 <div class="source-tag">
-                  <span>📡 來源：${s.source}</span>
+                  <span>📡 來源：${s.source} ${s.updateTime}</span>
                 </div>
                 <div class="value-grid">
                   <div class="v-box"><span class="v-lbl">EPS (近四季)</span><span class="v-val">${s.eps}</span></div>
