@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>台股 200 強價值監控 - 完整分類版</title>
+    <title>台股 200 強價值監控 - 穩定版</title>
     <style>
         :root {
             --bg: #0d1117;
@@ -203,7 +203,7 @@
         #loading {
             position: fixed;
             inset: 0;
-            background: rgba(0, 0, 0, 0.8);
+            background: rgba(0, 0, 0, 0.85);
             display: none;
             justify-content: center;
             align-items: center;
@@ -287,6 +287,26 @@
         let currentMarket = [];
         let sortKey = "price";
 
+        // ===== 頁面初始化：從 LocalStorage 載入緩存 =====
+        function loadCache(catId) {
+            const key = `marketData_${catId}`;
+            const cached = localStorage.getItem(key);
+            if (cached) {
+                try {
+                    const data = JSON.parse(cached);
+                    if (Array.isArray(data) && data.length > 0) {
+                        return data;
+                    }
+                } catch (e) { /* ignore */ }
+            }
+            return [];
+        }
+
+        function saveCache(catId, data) {
+            const key = `marketData_${catId}`;
+            localStorage.setItem(key, JSON.stringify(data));
+        }
+
         function selectCat(id) {
             currentCat = id;
             document.querySelectorAll('.c-btn').forEach(b => b.classList.remove('active'));
@@ -294,25 +314,35 @@
 
             document.getElementById('catDesc').textContent = `${CATEGORIES[id].label} (${Object.keys(CATEGORIES[id].stocks).length} 檔)`;
             document.getElementById('syncBtn').style.display = 'block';
-            currentMarket = [];
+
+            // 先顯示緩存數據
+            currentMarket = loadCache(id);
             render();
+
+            // 如果緩存為空，自動觸發同步
+            if (currentMarket.length === 0) {
+                fetchAllData();
+            } else {
+                document.getElementById('updateTime').textContent =
+                    `上次數據: ${new Date().toLocaleTimeString()} (來自緩存)`;
+            }
         }
 
-        // 改良的成長率估算（更貼近真實）
+        // ===== 優化的成長率估算模型 =====
         function estimateGrowth(per) {
-            if (!per || per < 0) return 5;
-            // 保守估計：本益比越高，預期成長率越低
-            let g = 45 - (per * 1.2);
-            return Math.max(3, Math.min(50, Math.round(g)));
+            if (!per || per <= 0) return 5;
+            // 避免極端高 PER 導致成長率過低，提高下限
+            let g = 45 - (per * 1.1);
+            return Math.max(6, Math.min(50, Math.round(g)));
         }
 
-        // ===== 核心：修正後的 fetchStock（加入重試、超時、異常處理） =====
+        // ===== 核心：穩定的 fetchStock（序列化 + 指數退避） =====
         async function fetchStock(code, name, retries = 3) {
             for (let attempt = 0; attempt < retries; attempt++) {
                 try {
-                    const year = new Date().getFullYear() - 1; // 使用去年數據，避免未來空白
+                    const year = new Date().getFullYear() - 1;
                     const controller = new AbortController();
-                    const timeout = setTimeout(() => controller.abort(), 8000); // 8 秒超時
+                    const timeout = setTimeout(() => controller.abort(), 10000);
 
                     const priceUrl =
                         `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPrice&data_id=${code}&start_date=${year}-01-01`;
@@ -340,13 +370,18 @@
                     const open = Number(last.open);
                     const change = price - open;
 
-                    // 處理 PER 缺失：保守預設
                     let per = lastV?.PER;
-                    if (!per || per <= 0 || per > 1000) {
-                        per = price / 5; // 預設本益比 5 倍（保守）
+                    // 處理極端值：缺失、0、負值或 >200 視為異常
+                    if (!per || per <= 0 || per > 200) {
+                        per = price / 6; // 保守預設本益比
                     }
 
                     const growth = estimateGrowth(per);
+                    // 計算標準 PEG，但若成長率低於 5%，標記為無效
+                    let peg = null;
+                    if (growth >= 5) {
+                        peg = per / (growth / 100);
+                    }
 
                     return {
                         code,
@@ -357,7 +392,7 @@
                         per: Number(per).toFixed(2),
                         eps: per ? (price / per).toFixed(2) : "--",
                         growth,
-                        peg: per / (growth / 100) // ✅ 標準 PEG 公式：成長率轉為小數
+                        peg
                     };
 
                 } catch (e) {
@@ -365,13 +400,13 @@
                         console.warn(`[${code}] 同步失敗:`, e.message);
                         return null;
                     }
-                    // 重試延遲遞增：1s, 2s, 3s
-                    await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+                    // 指數退避：1s, 2s, 4s
+                    await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt)));
                 }
             }
         }
 
-        // ===== 優化的 fetchAllData（批次處理 + 防頻限） =====
+        // ===== 優化的 fetchAllData（序列化 + 持久化 + 重試） =====
         async function fetchAllData() {
             if (!currentCat) return;
 
@@ -385,33 +420,46 @@
             const stockList = CATEGORIES[currentCat].stocks;
             const codes = Object.keys(stockList);
             const results = [];
+            const failedList = [];
 
-            // 分批處理，每批最多 3 個並發請求
-            const BATCH_SIZE = 3;
-            for (let i = 0; i < codes.length; i += BATCH_SIZE) {
-                const batch = codes.slice(i, i + BATCH_SIZE);
-                const batchPromises = batch.map(async (code) => {
-                    progText.textContent =
-                        `同步中：${stockList[code]} (${i + 1}/${codes.length})`;
-                    return await fetchStock(code, stockList[code]);
-                });
+            // 序列化請求，每次 1 檔，間隔 1.2 秒
+            for (let i = 0; i < codes.length; i++) {
+                const code = codes[i];
+                progText.textContent = `同步中：${stockList[code]} (${i + 1}/${codes.length})`;
 
-                const batchResults = await Promise.all(batchPromises);
-                results.push(...batchResults.filter(Boolean));
+                const data = await fetchStock(code, stockList[code]);
+                if (data) {
+                    results.push(data);
+                } else {
+                    failedList.push(code);
+                }
 
-                // 批次之間延遲 600ms，避免 API 頻率限制
-                await new Promise(r => setTimeout(r, 600));
+                // 間隔 1200ms，降低 API 壓力
+                await new Promise(r => setTimeout(r, 1200));
+            }
+
+            // 對失敗清單進行第二輪重試（僅一次）
+            if (failedList.length > 0) {
+                progText.textContent = `重試失敗的 ${failedList.length} 檔...`;
+                for (let i = 0; i < failedList.length; i++) {
+                    const code = failedList[i];
+                    const data = await fetchStock(code, stockList[code], 1);
+                    if (data) results.push(data);
+                    await new Promise(r => setTimeout(r, 1500));
+                }
             }
 
             currentMarket = results;
+            // 儲存到 LocalStorage
+            saveCache(currentCat, results);
+
             document.getElementById("updateTime").textContent =
-                `最後更新: ${new Date().toLocaleTimeString()}`;
+                `最後更新: ${new Date().toLocaleTimeString()} (共 ${results.length} 檔)`;
             loading.style.display = "none";
             syncBtn.disabled = false;
 
-            // 通知用戶缺失情況
             if (results.length < codes.length) {
-                alert(`同步完成，但有 ${codes.length - results.length} 檔股票數據缺失（可能因 API 限制）。可再次點擊同步重試。`);
+                alert(`同步完成，但有 ${codes.length - results.length} 檔股票數據缺失。\n可再次點擊同步重試。`);
             }
 
             render();
@@ -431,23 +479,44 @@
             let filtered = currentMarket.filter(s => s.code.includes(query) || s.name.includes(query));
 
             filtered.sort((a, b) => {
-                if (sortKey === "peg") return (a.peg || 9999) - (b.peg || 9999);
+                if (sortKey === "peg") {
+                    // PEG 排序：無效值 (null) 排最後
+                    const pa = a.peg !== null ? a.peg : 99999;
+                    const pb = b.peg !== null ? b.peg : 99999;
+                    return pa - pb;
+                }
                 if (sortKey === "change") return (b.change / b.price) - (a.change / a.price);
                 return b.price - a.price;
             });
 
             if (filtered.length === 0 && currentCat) {
-                grid.innerHTML =
-                    `<div style="grid-column:1/-1; text-align:center; padding:80px; color:var(--dim);">尚未同步此類別數據，請點擊「🚀 同步數據」。</div>`;
+                grid.innerHTML = `<div style="grid-column:1/-1; text-align:center; padding:80px; color:var(--dim);">尚無數據，請點擊「🚀 同步數據」。</div>`;
                 return;
             }
 
             grid.innerHTML = filtered.map(s => {
                 const isUp = s.change > 0;
                 const cClass = isUp ? "up" : (s.change < 0 ? "down" : "");
-                // 標準 PEG 判斷：<1 低估，1~1.5 合理，>1.5 偏貴
-                const peg = s.peg;
-                const pegColor = peg < 1 ? "#34d399" : (peg > 1.5 ? "#f87171" : "#fbbf24");
+
+                // 處理 PEG 顯示
+                let pegDisplay, pegColor, pegStatus;
+                if (s.peg !== null && s.peg !== undefined) {
+                    pegDisplay = Number(s.peg).toFixed(2);
+                    if (s.peg < 1) {
+                        pegColor = "#34d399";
+                        pegStatus = "低估";
+                    } else if (s.peg <= 1.5) {
+                        pegColor = "#fbbf24";
+                        pegStatus = "合理";
+                    } else {
+                        pegColor = "#f87171";
+                        pegStatus = "偏貴";
+                    }
+                } else {
+                    pegDisplay = "N/A";
+                    pegColor = "#8b949e";
+                    pegStatus = "成長過低";
+                }
 
                 return `
               <div class="card">
@@ -457,7 +526,7 @@
                     <div class="name">${s.name}</div>
                   </div>
                   <div class="peg-label" style="background:${pegColor}15; color:${pegColor}; border:1px solid ${pegColor}40;">
-                    PEG ${Number(peg).toFixed(2)}<br><span style="font-size:0.6rem">${peg < 1 ? '低估' : (peg > 1.5 ? '偏貴' : '合理')}</span>
+                    PEG ${pegDisplay}<br><span style="font-size:0.6rem">${pegStatus}</span>
                   </div>
                 </div>
                 <div class="price-row">
