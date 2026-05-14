@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>台股 200 強價值監控 - 穩定版</title>
+    <title>台股 200 強價值監控 - 即時版</title>
     <style>
         :root {
             --bg: #0d1117;
@@ -238,7 +238,7 @@
 
     <header>
         <div class="logo">
-            <h1>台股價值監控 <small style="font-size: 0.7rem; color: var(--dim);">Top 200 完整版</small></h1>
+            <h1>台股價值監控 <small style="font-size: 0.7rem; color: var(--dim);">PEG 即時版</small></h1>
         </div>
         <input type="text" id="searchInput" class="search-box" style="background:#0d1117; border:1px solid var(--border); border-radius:6px; padding:8px; color:white; width:200px;" placeholder="篩選當前結果..." oninput="render()">
     </header>
@@ -328,16 +328,47 @@
             }
         }
 
-        // ===== 優化的成長率估算模型 =====
-        function estimateGrowth(per) {
-            if (!per || per <= 0) return 5;
-            // 避免極端高 PER 導致成長率過低，提高下限
-            let g = 45 - (per * 1.1);
-            return Math.max(6, Math.min(50, Math.round(g)));
+        // ===== 核心：獲取 EPS 歷史數據並計算年增率 =====
+        async function fetchEPSGrowth(code) {
+            try {
+                const year = new Date().getFullYear() - 2;
+                const epsUrl =
+                    `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockEPS&data_id=${code}&start_date=${year}-01-01`;
+                const controller = new AbortController();
+                const timeout = setTimeout(() => controller.abort(), 8000);
+                const res = await fetch(epsUrl, { signal: controller.signal });
+                clearTimeout(timeout);
+                if (!res.ok) return null;
+                const json = await res.json();
+                if (!json.data || json.data.length < 8) return null; // 需要至少兩年數據
+
+                // 排序：近期的在前面
+                const sorted = json.data.sort((a, b) => {
+                    const dateA = new Date(a.date).getTime();
+                    const dateB = new Date(b.date).getTime();
+                    return dateB - dateA;
+                });
+
+                // 取最近 8 個季度（約兩年）
+                const recent = sorted.slice(0, 8);
+                if (recent.length < 8) return null;
+
+                // 近四季總和 (indices 0,1,2,3)
+                const epsRecent4 = recent.slice(0, 4).reduce((sum, item) => sum + Number(item.EPS), 0);
+                // 去年同期四季總和 (indices 4,5,6,7)
+                const epsLast4 = recent.slice(4, 8).reduce((sum, item) => sum + Number(item.EPS), 0);
+
+                if (epsLast4 === 0) return null;
+                const growth = (epsRecent4 - epsLast4) / Math.abs(epsLast4) * 100;
+                return Math.round(growth * 10) / 10; // 四捨五入到一位小數
+            } catch (e) {
+                console.warn(`[${code}] 獲取EPS失敗:`, e.message);
+                return null;
+            }
         }
 
-        // ===== 核心：穩定的 fetchStock（序列化 + 指數退避） =====
-        async function fetchStock(code, name, retries = 3) {
+        // ===== 穩定的 fetchStock（序列化 + 重試） =====
+        async function fetchStock(code, name, retries = 2) {
             for (let attempt = 0; attempt < retries; attempt++) {
                 try {
                     const year = new Date().getFullYear() - 1;
@@ -371,14 +402,23 @@
                     const change = price - open;
 
                     let per = lastV?.PER;
-                    // 處理極端值：缺失、0、負值或 >200 視為異常
                     if (!per || per <= 0 || per > 200) {
                         per = price / 6; // 保守預設本益比
                     }
 
-                    const growth = estimateGrowth(per);
-                    // 計算標準 PEG，但若成長率低於 5%，標記為無效
+                    // 獲取 EPS 成長率（這是 PEG 正確性的關鍵）
+                    const growthFromEPS = await fetchEPSGrowth(code);
+                    let growth;
                     let peg = null;
+
+                    if (growthFromEPS !== null && growthFromEPS >= 3 && growthFromEPS <= 200) {
+                        growth = growthFromEPS;
+                    } else {
+                        // 若數據不足或成長率離譜，則使用保守預設值（僅作為顯示）
+                        growth = 8;
+                    }
+
+                    // PEG 計算：成長率低於 5% 視為無意義，顯示 N/A
                     if (growth >= 5) {
                         peg = per / (growth / 100);
                     }
@@ -400,13 +440,12 @@
                         console.warn(`[${code}] 同步失敗:`, e.message);
                         return null;
                     }
-                    // 指數退避：1s, 2s, 4s
-                    await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt)));
+                    await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
                 }
             }
         }
 
-        // ===== 優化的 fetchAllData（序列化 + 持久化 + 重試） =====
+        // ===== 優化的 fetchAllData（序列化 + 持久化） =====
         async function fetchAllData() {
             if (!currentCat) return;
 
@@ -422,7 +461,7 @@
             const results = [];
             const failedList = [];
 
-            // 序列化請求，每次 1 檔，間隔 1.2 秒
+            // 序列化請求，降低 API 壓力
             for (let i = 0; i < codes.length; i++) {
                 const code = codes[i];
                 progText.textContent = `同步中：${stockList[code]} (${i + 1}/${codes.length})`;
@@ -434,23 +473,21 @@
                     failedList.push(code);
                 }
 
-                // 間隔 1200ms，降低 API 壓力
-                await new Promise(r => setTimeout(r, 1200));
+                await new Promise(r => setTimeout(r, 1000));
             }
 
-            // 對失敗清單進行第二輪重試（僅一次）
+            // 重試失敗清單
             if (failedList.length > 0) {
                 progText.textContent = `重試失敗的 ${failedList.length} 檔...`;
                 for (let i = 0; i < failedList.length; i++) {
                     const code = failedList[i];
                     const data = await fetchStock(code, stockList[code], 1);
                     if (data) results.push(data);
-                    await new Promise(r => setTimeout(r, 1500));
+                    await new Promise(r => setTimeout(r, 1200));
                 }
             }
 
             currentMarket = results;
-            // 儲存到 LocalStorage
             saveCache(currentCat, results);
 
             document.getElementById("updateTime").textContent =
@@ -480,7 +517,6 @@
 
             filtered.sort((a, b) => {
                 if (sortKey === "peg") {
-                    // PEG 排序：無效值 (null) 排最後
                     const pa = a.peg !== null ? a.peg : 99999;
                     const pb = b.peg !== null ? b.peg : 99999;
                     return pa - pb;
@@ -498,7 +534,6 @@
                 const isUp = s.change > 0;
                 const cClass = isUp ? "up" : (s.change < 0 ? "down" : "");
 
-                // 處理 PEG 顯示
                 let pegDisplay, pegColor, pegStatus;
                 if (s.peg !== null && s.peg !== undefined) {
                     pegDisplay = Number(s.peg).toFixed(2);
@@ -515,7 +550,7 @@
                 } else {
                     pegDisplay = "N/A";
                     pegColor = "#8b949e";
-                    pegStatus = "成長過低";
+                    pegStatus = "數據不足";
                 }
 
                 return `
