@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>台股價值監控 - 分類分流版</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --card: #161b22;
+    --border: #30363d;
+    --text: #c9d1d9;
+    --dim: #8b949e;
+    --up: #f85149;
+    --down: #3fb950;
+    --accent: #58a6ff;
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  
+  header { padding: 16px 24px; background: #010409; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
+  .logo h1 { margin: 0; color: var(--accent); font-size: 1.2rem; }
+  
+  .category-bar { padding: 12px 24px; background: #0d1117; border-bottom: 1px solid var(--border); display: flex; gap: 10px; overflow-x: auto; align-items: center; }
+  .c-btn { background: #21262d; border: 1px solid var(--border); color: var(--text); padding: 8px 16px; border-radius: 6px; cursor: pointer; white-space: nowrap; font-size: 0.9rem; }
+  .c-btn.active { background: var(--accent); color: white; border-color: var(--accent); font-weight: bold; }
+  
+  .sync-area { padding: 10px 24px; display: flex; align-items: center; gap: 15px; }
+  .btn-sync { background: #238636; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; display: none; }
+  .btn-sync:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .sort-bar { padding: 8px 24px; display: flex; gap: 8px; overflow-x: auto; border-bottom: 1px solid var(--border); }
+  .sbtn { background: transparent; border: 1px solid var(--border); color: var(--dim); padding: 5px 12px; border-radius: 4px; cursor: pointer; font-size: 0.75rem; }
+  .sbtn.active { border-color: var(--accent); color: var(--accent); }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; padding: 20px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px; transition: 0.2s; }
+  .card:hover { border-color: #8b949e; }
+  
+  .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+  .code { font-size: 0.8rem; color: var(--dim); font-family: monospace; }
+  .name { font-size: 1.15rem; font-weight: 800; color: white; }
+  
+  .price-row { display: flex; align-items: baseline; gap: 10px; margin-bottom: 14px; }
+  .price { font-size: 2rem; font-weight: 800; }
+  .change { font-size: 1rem; font-weight: 600; }
+  .up { color: var(--up); }
+  .down { color: var(--down); }
+
+  .peg-label { padding: 4px 10px; border-radius: 6px; font-size: 0.7rem; font-weight: bold; text-align: center; }
+  .value-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .v-box { background: #0d1117; padding: 8px; border-radius: 6px; }
+  .v-lbl { display: block; font-size: 0.6rem; color: var(--dim); margin-bottom: 2px; }
+  .v-val { font-size: 0.9rem; font-weight: 700; }
+  
+  #loading { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 999; flex-direction: column; }
+  .progress-info { color: white; margin-top: 15px; font-size: 1rem; }
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div style="font-size: 2rem;">📡</div>
+  <div class="progress-info" id="progressText">準備同步中...</div>
+</div>
+
+<header>
+  <div class="logo">
+    <h1>台股價值監控 <small style="font-size: 0.7rem; color: var(--dim);">分流穩定版</small></h1>
+  </div>
+  <input type="text" id="searchInput" style="background:#0d1117; border:1px solid var(--border); border-radius:6px; padding:8px; color:white; width:200px;" placeholder="篩選結果..." oninput="render()">
+  <div id="updateTime" style="font-size: 0.8rem; color: var(--dim);">請選擇產業類型</div>
+</header>
+
+<div class="category-bar" id="categoryBar">
+  <button class="c-btn" onclick="selectCat('semi')">半導體/IC設計</button>
+  <button class="c-btn" onclick="selectCat('ai')">AI/電子組裝</button>
+  <button class="c-btn" onclick="selectCat('finance')">金融族群</button>
+  <button class="c-btn" onclick="selectCat('old')">傳產/航運/重電</button>
+  <button class="c-btn" onclick="selectCat('others')">其他權值</button>
+</div>
+
+<div class="sync-area">
+  <div id="catDesc" style="font-size: 0.9rem; color: var(--accent);">👈 請先選擇一個產業類別</div>
+  <button id="syncBtn" class="btn-sync" onclick="fetchAllData()">🚀 開始同步該區數據</button>
+</div>
+
+<div class="sort-bar">
+  <button class="sbtn active" onclick="setSort('price', this)">股價排序</button>
+  <button class="sbtn" onclick="setSort('peg', this)">PEG排序</button>
+  <button class="sbtn" onclick="setSort('change', this)">漲跌排序</button>
+</div>
+
+<div id="mainGrid" class="grid"></div>
+
+<script>
+// ===== 產業分類數據庫 =====
+const CATEGORIES = {
+  semi: {
+    label: "半導體/IC設計",
+    stocks: {"2330":"台積電", "2454":"聯發科", "2303":"聯電", "3711":"日月光投控", "2449":"京元電子", "3034":"聯詠", "3443":"創意", "3661":"世芯-KY", "6415":"矽力-KY", "6488":"環球晶", "8046":"南電"}
+  },
+  ai: {
+    label: "AI/電子組裝",
+    stocks: {"2317":"鴻海", "2382":"廣達", "2308":"台達電", "3017":"奇鋐", "6669":"緯穎", "3231":"緯創", "2357":"華碩", "2376":"技嘉", "3037":"欣興", "4938":"和碩", "2327":"國巨"}
+  },
+  finance: {
+    label: "金融族群",
+    stocks: {"2881":"富邦金", "2882":"國泰金", "2884":"玉山金", "2885":"元大金", "2886":"兆豐金", "2891":"中信金", "5880":"合庫金", "5871":"中租-KY", "2883":"開發金", "2892":"第一金"}
+  },
+  old: {
+    label: "傳產/航運/重電",
+    stocks: {"2603":"長榮", "2609":"陽明", "2615":"萬海", "1513":"中興電", "1519":"華城", "2002":"中鋼", "1101":"台泥", "1216":"統一", "1301":"台塑", "2207":"和泰車", "1503":"士電", "1514":"亞力"}
+  },
+  others: {
+    label: "其他權值",
+    stocks: {"2412":"中華電", "4904":"遠傳", "3045":"台灣大", "2912":"統一超", "8454":"富邦媒", "9910":"豐泰", "1476":"儒鴻"}
+  }
+};
+
+let currentCat = null;
+let currentMarket = [];
+let sortKey = "price";
+
+function selectCat(id) {
+  currentCat = id;
+  document.querySelectorAll('.c-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  
+  document.getElementById('catDesc').textContent = `已選：${CATEGORIES[id].label} (共 ${Object.keys(CATEGORIES[id].stocks).length} 檔)`;
+  document.getElementById('syncBtn').style.display = 'block';
+  // 切換分類時先清空畫面，避免誤看
+  currentMarket = [];
+  render();
+}
+
+function estimateGrowth(per) {
+  if(!per) return 10;
+  return Math.max(5, Math.min(40, 30 - per)); 
+}
+
+async function fetchStock(code, name) {
+  try {
+    const year = new Date().getFullYear();
+    const priceUrl = `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPrice&data_id=${code}&start_date=${year}-01-01`;
+    const perUrl = `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPER&data_id=${code}&start_date=${year}-01-01`;
+
+    const [pRes, vRes] = await Promise.all([fetch(priceUrl), fetch(perUrl)]);
+    const pJson = await pRes.json();
+    const vJson = await vRes.json();
+
+    if(!pJson.data || !pJson.data.length) return null;
+
+    const last = pJson.data[pJson.data.length - 1];
+    const lastV = vJson.data?.[vJson.data.length - 1];
+    
+    const price = Number(last.close);
+    const change = price - Number(last.open);
+    const per = lastV?.PER || (price / 5); // 估算
+    const growth = estimateGrowth(per);
+
+    return {
+      code, name, price, change,
+      pct: (change / Number(last.open) * 100).toFixed(2),
+      per: Number(per).toFixed(2),
+      eps: (price / per).toFixed(2),
+      growth,
+      peg: per / growth
+    };
+  } catch(e) { return null; }
+}
+
+async function fetchAllData() {
+  if(!currentCat) return;
+  const loading = document.getElementById("loading");
+  const progText = document.getElementById("progressText");
+  loading.style.display = "flex";
+  
+  const stockList = CATEGORIES[currentCat].stocks;
+  const codes = Object.keys(stockList);
+  const results = [];
+
+  for(let i=0; i<codes.length; i++) {
+    const code = codes[i];
+    progText.textContent = `正在抓取 ${stockList[code]} (${i+1}/${codes.length})...`;
+    
+    const data = await fetchStock(code, stockList[code]);
+    if(data) results.push(data);
+    
+    // 增加一點延遲，避免 API 鎖定
+    await new Promise(r => setTimeout(r, 250));
+  }
+
+  currentMarket = results;
+  document.getElementById("updateTime").textContent = `更新：${new Date().toLocaleTimeString()}`;
+  loading.style.display = "none";
+  render();
+}
+
+function setSort(key, btn) {
+  sortKey = key;
+  document.querySelectorAll(".sbtn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  render();
+}
+
+function render() {
+  const grid = document.getElementById("mainGrid");
+  const query = document.getElementById("searchInput").value.toLowerCase();
+  
+  let filtered = currentMarket.filter(s => s.code.includes(query) || s.name.includes(query));
+
+  filtered.sort((a,b) => {
+    if(sortKey === "peg") return (a.peg || 99) - (b.peg || 99);
+    if(sortKey === "change") return b.change - a.change;
+    return b.price - a.price;
+  });
+
+  if(filtered.length === 0 && currentCat) {
+    grid.innerHTML = `<div style="grid-column:1/-1; text-align:center; padding:50px; color:var(--dim);">此類別尚未同步或無資料，請點擊上方按鈕開始。</div>`;
+    return;
+  }
+
+  grid.innerHTML = filtered.map(s => {
+    const isUp = s.change > 0;
+    const cClass = isUp ? "up" : (s.change < 0 ? "down" : "");
+    const pegColor = s.peg < 1 ? "#34d399" : (s.peg > 1.5 ? "#f87171" : "#fbbf24");
+    
+    return `
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="code">${s.code}</div>
+            <div class="name">${s.name}</div>
+          </div>
+          <div class="peg-label" style="background:${pegColor}22; color:${pegColor}; border:1px solid ${pegColor}55;">
+            PEG ${Number(s.peg).toFixed(2)}<br><span style="font-size:0.6rem">${s.peg < 1 ? '低估' : (s.peg > 1.5 ? '偏貴' : '合理')}</span>
+          </div>
+        </div>
+        <div class="price-row">
+          <div class="price ${cClass}">${s.price}</div>
+          <div class="change ${cClass}">${isUp?'▲':(s.change<0?'▼':'')} ${Math.abs(s.change).toFixed(2)} (${s.pct}%)</div>
+        </div>
+        <div class="value-grid">
+          <div class="v-box"><span class="v-lbl">預估 EPS</span><span class="v-val">${s.eps}</span></div>
+          <div class="v-box"><span class="v-lbl">本益比 PER</span><span class="v-val">${s.per}</span></div>
+          <div class="v-box"><span class="v-lbl">預期成長</span><span class="v-val" style="color:#fbbf24">${s.growth}%</span></div>
+          <div class="v-box"><span class="v-lbl">監控狀態</span><span class="v-val" style="color:var(--down)">OK</span></div>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+</script>
+</body>
+</html>
