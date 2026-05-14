@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>台股 200 強價值監控 - 修正版</title>
+    <title>台股 200 強價值監控 - 穩定版</title>
     <style>
         :root {
             --bg: #0d1117;
@@ -238,7 +238,7 @@
 
     <header>
         <div class="logo">
-            <h1>台股價值監控 <small style="font-size: 0.7rem; color: var(--dim);">PEG 修正版</small></h1>
+            <h1>台股價值監控 <small style="font-size: 0.7rem; color: var(--dim);">PEG 穩定版</small></h1>
         </div>
         <input type="text" id="searchInput" class="search-box" style="background:#0d1117; border:1px solid var(--border); border-radius:6px; padding:8px; color:white; width:200px;" placeholder="篩選當前結果..." oninput="render()">
     </header>
@@ -286,6 +286,7 @@
         let currentCat = null;
         let currentMarket = [];
         let sortKey = "price";
+        let consecutiveFailures = 0; // 連續失敗計數器
 
         // ===== 頁面初始化：從 LocalStorage 載入緩存 =====
         function loadCache(catId) {
@@ -315,11 +316,9 @@
             document.getElementById('catDesc').textContent = `${CATEGORIES[id].label} (${Object.keys(CATEGORIES[id].stocks).length} 檔)`;
             document.getElementById('syncBtn').style.display = 'block';
 
-            // 先顯示緩存數據
             currentMarket = loadCache(id);
             render();
 
-            // 如果緩存為空，自動觸發同步
             if (currentMarket.length === 0) {
                 fetchAllData();
             } else {
@@ -338,12 +337,16 @@
                 const timeout = setTimeout(() => controller.abort(), 8000);
                 const res = await fetch(epsUrl, { signal: controller.signal });
                 clearTimeout(timeout);
-                if (!res.ok) return null;
+                
+                if (!res.ok) {
+                    console.warn(`[${code}] EPS 資料請求失敗，狀態碼: ${res.status}`);
+                    return null;
+                }
+                
                 const json = await res.json();
                 
                 // 過濾掉無效的 EPS 值
                 const validData = json.data.filter(item => item.EPS !== null && item.EPS !== undefined && !isNaN(Number(item.EPS)));
-                // 至少需要 8 個季度才能計算年增率（原為 8，這裡維持標準要求，確保數據可靠）
                 if (validData.length < 8) return null;
 
                 // 按日期排序（最近的在前）
@@ -360,18 +363,16 @@
                 // 去年同期四季總和 (後4個)
                 const epsLast4 = recent.slice(4, 8).reduce((sum, item) => sum + Number(item.EPS), 0);
 
-                // ✅ 專家修正：處理去年 EPS 為 0 的情況，且今年轉盈
+                // 處理去年 EPS 為 0 的情況
                 if (epsLast4 === 0) {
                     if (epsRecent4 > 0) {
-                        // 由虧轉盈，回傳 999 表示「轉盈」
+                        // 由虧轉盈，回傳 999
                         return 999;
                     } else {
-                        // 仍然沒賺錢或持續虧損
                         return null;
                     }
                 }
 
-                // 計算成長率（允許負值，保留小數一位）
                 let growth = (epsRecent4 - epsLast4) / Math.abs(epsLast4) * 100;
                 return Math.round(growth * 10) / 10;
             } catch (e) {
@@ -380,13 +381,13 @@
             }
         }
 
-        // ===== 穩定的 fetchStock（序列化 + 重試） =====
+        // ===== 穩定的 fetchStock（加入錯誤處理與超時） =====
         async function fetchStock(code, name, retries = 2) {
             for (let attempt = 0; attempt < retries; attempt++) {
                 try {
                     const year = new Date().getFullYear() - 1;
                     const controller = new AbortController();
-                    const timeout = setTimeout(() => controller.abort(), 10000);
+                    const timeout = setTimeout(() => controller.abort(), 12000);
 
                     const priceUrl =
                         `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPrice&data_id=${code}&start_date=${year}-01-01`;
@@ -400,12 +401,18 @@
 
                     clearTimeout(timeout);
 
-                    if (!pRes.ok || !vRes.ok) throw new Error('HTTP error');
+                    if (!pRes.ok || !vRes.ok) {
+                        console.warn(`[${code}] HTTP 錯誤: pRes.ok=${pRes.ok}, vRes.ok=${vRes.ok}`);
+                        throw new Error('HTTP error');
+                    }
 
                     const pJson = await pRes.json();
                     const vJson = await vRes.json();
 
-                    if (!pJson.data?.length) throw new Error('No price data');
+                    if (!pJson.data?.length) {
+                        console.warn(`[${code}] 無股價數據`);
+                        throw new Error('No price data');
+                    }
 
                     const last = pJson.data[pJson.data.length - 1];
                     const lastV = vJson.data?.[vJson.data.length - 1] || { PER: null };
@@ -419,19 +426,19 @@
                         per = price / 6;
                     }
 
-                    // 獲取 EPS 成長率（已放寬）
                     const growthFromEPS = await fetchEPSGrowth(code);
                     let growth = null;
                     let peg = null;
 
-                    // ✅ 預期成長無論正負都保留
                     if (growthFromEPS !== null) {
                         growth = growthFromEPS;
-                        // ✅ 僅當成長率 >= 5 且為正成長時才計算 PEG（符合專家標準）
                         if (growth >= 5) {
                             peg = per / (growth / 100);
                         }
                     }
+
+                    // 成功時重置連續失敗計數器
+                    consecutiveFailures = 0;
 
                     return {
                         code,
@@ -446,16 +453,17 @@
                     };
 
                 } catch (e) {
+                    console.warn(`[${code}] 嘗試 ${attempt + 1}/${retries} 失敗:`, e.message);
                     if (attempt === retries - 1) {
-                        console.warn(`[${code}] 同步失敗:`, e.message);
+                        consecutiveFailures++;
                         return null;
                     }
-                    await new Promise(r => setTimeout(r, 500 * (attempt + 1)));
+                    await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
                 }
             }
         }
 
-        // ===== 優化的 fetchAllData（序列化 + 持久化，間隔 500ms） =====
+        // ===== 優化的 fetchAllData（加入失敗計數與間隔調整） =====
         async function fetchAllData() {
             if (!currentCat) return;
 
@@ -465,6 +473,7 @@
 
             loading.style.display = "flex";
             syncBtn.disabled = true;
+            consecutiveFailures = 0;
 
             const stockList = CATEGORIES[currentCat].stocks;
             const codes = Object.keys(stockList);
@@ -475,6 +484,12 @@
                 const code = codes[i];
                 progText.textContent = `同步中：${stockList[code]} (${i + 1}/${codes.length})`;
 
+                // 如果連續失敗超過 5 次，停止同步並顯示警告
+                if (consecutiveFailures >= 5) {
+                    alert(`⚠️ 連續失敗 ${consecutiveFailures} 次，可能已觸發 API 限制。\n請稍待 5~10 分鐘後再試。`);
+                    break;
+                }
+
                 const data = await fetchStock(code, stockList[code]);
                 if (data) {
                     results.push(data);
@@ -482,16 +497,18 @@
                     failedList.push(code);
                 }
 
-                await new Promise(r => setTimeout(r, 500));
+                // 間隔 1200ms，確保 API 不會被鎖
+                await new Promise(r => setTimeout(r, 1200));
             }
 
-            if (failedList.length > 0) {
+            // 如果沒有因為連續失敗而中斷，則重試失敗清單
+            if (consecutiveFailures < 5 && failedList.length > 0) {
                 progText.textContent = `重試失敗的 ${failedList.length} 檔...`;
                 for (let i = 0; i < failedList.length; i++) {
                     const code = failedList[i];
                     const data = await fetchStock(code, stockList[code], 1);
                     if (data) results.push(data);
-                    await new Promise(r => setTimeout(r, 600));
+                    await new Promise(r => setTimeout(r, 1500));
                 }
             }
 
@@ -561,7 +578,6 @@
                     pegStatus = "數據不足";
                 }
 
-                // ✅ 預期成長顯示邏輯
                 let growthDisplay;
                 if (s.growth === null) {
                     growthDisplay = '--';
