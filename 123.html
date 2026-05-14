@@ -328,7 +328,7 @@
             }
         }
 
-        // ===== 核心：獲取 EPS 歷史數據並計算年增率 =====
+        // ===== 修正後的 EPS 成長率計算（放寬標準） =====
         async function fetchEPSGrowth(code) {
             try {
                 const year = new Date().getFullYear() - 2;
@@ -340,10 +340,10 @@
                 clearTimeout(timeout);
                 if (!res.ok) return null;
                 const json = await res.json();
-                if (!json.data || json.data.length < 8) return null;
-
+                
                 // 過濾掉無效的 EPS 值
                 const validData = json.data.filter(item => item.EPS !== null && item.EPS !== undefined && !isNaN(Number(item.EPS)));
+                // 至少需要 8 個季度才能計算年增率（原為 8，這裡維持標準要求，確保數據可靠）
                 if (validData.length < 8) return null;
 
                 // 按日期排序（最近的在前）
@@ -353,17 +353,26 @@
                     return dateB - dateA;
                 });
 
-                // 取最近 8 個季度
                 const recent = sorted.slice(0, 8);
-                if (recent.length < 8) return null;
-
+                
                 // 近四季總和 (前4個)
                 const epsRecent4 = recent.slice(0, 4).reduce((sum, item) => sum + Number(item.EPS), 0);
                 // 去年同期四季總和 (後4個)
                 const epsLast4 = recent.slice(4, 8).reduce((sum, item) => sum + Number(item.EPS), 0);
 
-                if (epsLast4 === 0) return null;
-                const growth = (epsRecent4 - epsLast4) / Math.abs(epsLast4) * 100;
+                // ✅ 專家修正：處理去年 EPS 為 0 的情況，且今年轉盈
+                if (epsLast4 === 0) {
+                    if (epsRecent4 > 0) {
+                        // 由虧轉盈，回傳 999 表示「轉盈」
+                        return 999;
+                    } else {
+                        // 仍然沒賺錢或持續虧損
+                        return null;
+                    }
+                }
+
+                // 計算成長率（允許負值，保留小數一位）
+                let growth = (epsRecent4 - epsLast4) / Math.abs(epsLast4) * 100;
                 return Math.round(growth * 10) / 10;
             } catch (e) {
                 console.warn(`[${code}] 獲取EPS失敗:`, e.message);
@@ -410,13 +419,15 @@
                         per = price / 6;
                     }
 
-                    // 獲取 EPS 成長率
+                    // 獲取 EPS 成長率（已放寬）
                     const growthFromEPS = await fetchEPSGrowth(code);
                     let growth = null;
                     let peg = null;
 
+                    // ✅ 預期成長無論正負都保留
                     if (growthFromEPS !== null) {
                         growth = growthFromEPS;
+                        // ✅ 僅當成長率 >= 5 且為正成長時才計算 PEG（符合專家標準）
                         if (growth >= 5) {
                             peg = per / (growth / 100);
                         }
@@ -550,7 +561,15 @@
                     pegStatus = "數據不足";
                 }
 
-                const growthDisplay = s.growth !== null ? s.growth + '%' : '--';
+                // ✅ 預期成長顯示邏輯
+                let growthDisplay;
+                if (s.growth === null) {
+                    growthDisplay = '--';
+                } else if (s.growth === 999) {
+                    growthDisplay = '轉盈';
+                } else {
+                    growthDisplay = s.growth + '%';
+                }
 
                 return `
               <div class="card">
