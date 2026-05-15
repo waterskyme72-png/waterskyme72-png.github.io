@@ -3,9 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>梁配筋核對系統 - Gemma4 穩定修正版</title>
+
+<title>Gemma4 單圖 OCR 測試</title>
 
 <style>
+
 *{
   box-sizing:border-box;
   margin:0;
@@ -17,28 +19,16 @@ body{
   color:#c8deff;
   font-family:'Segoe UI',sans-serif;
   padding:20px;
-
-  background-image:
-    linear-gradient(rgba(74,158,255,0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(74,158,255,0.05) 1px, transparent 1px);
-
-  background-size:30px 30px;
 }
 
 .container{
-  max-width:1000px;
+  max-width:900px;
   margin:auto;
 }
 
-header{
+h1{
   text-align:center;
   margin-bottom:25px;
-  padding-bottom:15px;
-  border-bottom:1px solid #1e4d8c;
-}
-
-h1{
-  font-size:26px;
   color:#fff;
 }
 
@@ -63,127 +53,127 @@ input,select{
   border-radius:5px;
 }
 
-.upload-area{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:15px;
-  margin-bottom:20px;
-}
-
 .drop-zone{
+
   border:2px dashed #1e4d8c;
-  height:180px;
+
+  height:220px;
+
   display:flex;
   flex-direction:column;
   align-items:center;
   justify-content:center;
+
   cursor:pointer;
+
   border-radius:8px;
+
   transition:0.3s;
+
   background:rgba(30,77,140,0.08);
 }
 
 .drop-zone:hover{
+
   border-color:#4a9eff;
+
   background:rgba(74,158,255,0.12);
 }
 
 .preview{
+
   max-width:95%;
-  max-height:140px;
+  max-height:180px;
+
   display:none;
+
+  margin-top:10px;
+
   border:1px solid #4a9eff;
-  margin-top:8px;
 }
 
 .btn-run{
+
   width:100%;
+
   padding:18px;
+
   background:#1e4d8c;
-  color:#fff;
+
   border:1px solid #4a9eff;
-  border-radius:5px;
-  cursor:pointer;
+
+  color:#fff;
+
   font-size:18px;
+
   font-weight:bold;
+
+  border-radius:5px;
+
+  cursor:pointer;
+
   transition:0.3s;
 }
 
 .btn-run:hover:not(:disabled){
+
   background:#2a6bbd;
 }
 
 .btn-run:disabled{
+
   opacity:0.4;
   cursor:not-allowed;
 }
 
 #statusLog{
+
   margin-top:20px;
+
   background:#000;
+
   border:1px solid #1e4d8c;
+
   padding:12px;
+
   max-height:200px;
+
   overflow-y:auto;
+
   font-size:12px;
+
   line-height:1.6;
 }
 
-#debugArea{
-  margin-top:15px;
-  background:#111;
-  border:1px solid #444;
-  padding:12px;
-  color:#00ff88;
-  white-space:pre-wrap;
-  display:none;
-  max-height:300px;
-  overflow-y:auto;
-  font-size:11px;
-}
-
-.log-blue{ color:#4a9eff; }
-.log-red{ color:#ff5a5a; }
-.log-green{ color:#48c774; }
-
-table{
-  width:100%;
-  border-collapse:collapse;
-  margin-top:25px;
-  display:none;
-}
-
-th,td{
-  border:1px solid #1e4d8c;
-  padding:10px;
-  text-align:left;
-}
-
-th{
-  background:rgba(74,158,255,0.12);
+.log-blue{
   color:#4a9eff;
 }
 
-tr.diff{
-  background:rgba(255,82,82,0.08);
+.log-red{
+  color:#ff5a5a;
 }
 
-.status-tag{
-  padding:3px 8px;
-  border-radius:4px;
-  font-size:11px;
-  font-weight:bold;
-}
-
-.tag-same{
-  background:#1d4d33;
+.log-green{
   color:#48c774;
 }
 
-.tag-diff{
-  background:#4d1d1d;
-  color:#ff5252;
+#result{
+
+  margin-top:25px;
+
+  background:#111;
+
+  border:1px solid #1e4d8c;
+
+  padding:15px;
+
+  white-space:pre-wrap;
+
+  line-height:1.7;
+
+  display:none;
 }
+
 </style>
 </head>
 
@@ -191,24 +181,27 @@ tr.diff{
 
 <div class="container">
 
-<header>
-<h1>梁配筋核對系統 (Gemma4 穩定修正版)</h1>
-</header>
+<h1>Gemma4 單圖 OCR 測試</h1>
 
 <div class="field">
+
 <label>GOOGLE AI API KEY</label>
+
 <input
   type="password"
   id="apiKey"
   placeholder="輸入 AIza..."
   oninput="checkReady()"
 />
+
 </div>
 
 <div class="field">
+
 <label>Gemma 4 模型</label>
 
 <select id="modelName">
+
   <option value="gemma-4-26b-a4b-it">
     gemma-4-26b-a4b-it
   </option>
@@ -216,80 +209,59 @@ tr.diff{
   <option value="gemma-4-31b-it">
     gemma-4-31b-it
   </option>
+
 </select>
-</div>
-
-<div class="upload-area">
-
-<div class="drop-zone" onclick="document.getElementById('fileA').click()">
-  <div id="textA">📐 上傳圖 A</div>
-  <img id="prevA" class="preview">
-  <input
-    type="file"
-    id="fileA"
-    hidden
-    accept="image/*"
-    onchange="handleFile(this,'A')"
-  >
-</div>
-
-<div class="drop-zone" onclick="document.getElementById('fileB').click()">
-  <div id="textB">📷 上傳圖 B</div>
-  <img id="prevB" class="preview">
-  <input
-    type="file"
-    id="fileB"
-    hidden
-    accept="image/*"
-    onchange="handleFile(this,'B')"
-  >
-</div>
 
 </div>
+
+<div
+  class="drop-zone"
+  onclick="document.getElementById('fileInput').click()"
+>
+
+<div id="uploadText">
+📷 上傳梁配筋圖
+</div>
+
+<img id="preview" class="preview">
+
+<input
+  type="file"
+  id="fileInput"
+  hidden
+  accept="image/*"
+  onchange="handleFile(this)"
+>
+
+</div>
+
+<br>
 
 <button
   id="runBtn"
   class="btn-run"
-  onclick="runAnalysis()"
+  onclick="runOCR()"
   disabled
 >
-▶ 開始分析
+▶ 開始 OCR
 </button>
 
 <div id="statusLog">
 系統就緒
 </div>
 
-<div id="debugArea"></div>
-
-<table id="resultTable">
-
-<thead>
-<tr>
-<th>梁號</th>
-<th>結果</th>
-<th>圖A</th>
-<th>圖B</th>
-<th>備註</th>
-</tr>
-</thead>
-
-<tbody id="resultBody"></tbody>
-
-</table>
+<div id="result"></div>
 
 </div>
 
 <script>
 
-let imgData = {
-  A:null,
-  B:null
-};
+let imageBase64 = null;
 
 function addLog(msg, cls=''){
 
-  const log = document.getElementById('statusLog');
+  const log =
+    document.getElementById('statusLog');
 
   log.innerHTML += `
     <div class="${cls}">
@@ -309,10 +281,10 @@ function checkReady(){
     .trim();
 
   document.getElementById('runBtn').disabled =
-    !(imgData.A && imgData.B && key);
+    !(key && imageBase64);
 }
 
-function handleFile(input, side){
+function handleFile(input){
 
   const file = input.files[0];
 
@@ -326,17 +298,19 @@ function handleFile(input, side){
 
     img.onload = ()=>{
 
-      const canvas = document.createElement('canvas');
+      const canvas =
+        document.createElement('canvas');
 
       let w = img.width;
       let h = img.height;
 
-      // 降低解析度避免 Gemma 卡死
+      // 降低解析度避免 Gemma 崩潰
       const MAX = 768;
 
       if(w > MAX || h > MAX){
 
-        const ratio = Math.min(MAX/w, MAX/h);
+        const ratio =
+          Math.min(MAX/w, MAX/h);
 
         w *= ratio;
         h *= ratio;
@@ -345,24 +319,31 @@ function handleFile(input, side){
       canvas.width = w;
       canvas.height = h;
 
-      const ctx = canvas.getContext('2d');
+      const ctx =
+        canvas.getContext('2d');
 
       ctx.drawImage(img,0,0,w,h);
 
-      // 壓縮品質
+      // 強壓縮
       const base64 =
-        canvas.toDataURL('image/jpeg',0.7);
+        canvas.toDataURL('image/jpeg',0.6);
 
-      imgData[side] =
+      imageBase64 =
         base64.split(',')[1];
 
-      document.getElementById('prev'+side).src = base64;
+      document.getElementById('preview').src =
+        base64;
 
-      document.getElementById('prev'+side).style.display='block';
+      document.getElementById('preview').style.display =
+        'block';
 
-      document.getElementById('text'+side).style.display='none';
+      document.getElementById('uploadText').style.display =
+        'none';
 
-      addLog(`圖 ${side} 處理完成`,`log-green`);
+      addLog(
+        '圖片處理完成',
+        'log-green'
+      );
 
       checkReady();
     };
@@ -373,25 +354,7 @@ function handleFile(input, side){
   reader.readAsDataURL(file);
 }
 
-function safeParseJSON(text){
-
-  try{
-    return JSON.parse(text);
-  }
-  catch(e){}
-
-  const match =
-    text.match(/\[[\s\S]*\]/);
-
-  if(!match){
-
-    throw new Error("找不到 JSON 陣列");
-  }
-
-  return JSON.parse(match[0]);
-}
-
-async function runAnalysis(){
+async function runOCR(){
 
   const btn =
     document.getElementById('runBtn');
@@ -405,18 +368,15 @@ async function runAnalysis(){
     document.getElementById('modelName')
     .value;
 
-  const debug =
-    document.getElementById('debugArea');
+  const resultDiv =
+    document.getElementById('result');
 
   btn.disabled = true;
 
   btn.innerText =
-    "⏳ Gemma 分析中...";
+    '⏳ Gemma OCR 中...';
 
-  document.getElementById('resultTable')
-    .style.display='none';
-
-  debug.style.display='none';
+  resultDiv.style.display='none';
 
   addLog(
     `正在連線 ${model}`,
@@ -432,12 +392,13 @@ async function runAnalysis(){
   const timeoutId =
     setTimeout(
       ()=>controller.abort(),
-      240000
+      180000
     );
 
   try{
 
-    const response = await fetch(url,{
+    const response =
+      await fetch(url,{
 
       method:'POST',
 
@@ -454,46 +415,26 @@ async function runAnalysis(){
             {
               text:
 `
-你是結構工程師。
+請辨識這張圖片中的所有文字。
 
-請辨識兩張梁配筋圖。
+這是工程梁配筋圖。
 
-只需比對：
+請完整輸出：
 
 1. 梁號
 2. 主筋
 3. 箍筋
 
-請只輸出 JSON 陣列。
-
-格式：
-
-[
- {
-   "beam":"B1",
-   "status":"same",
-   "vA":"4-D16",
-   "vB":"4-D16",
-   "note":""
- }
-]
-
-不要輸出 markdown。
-不要解釋。
+不要分析。
+不要JSON。
+只輸出辨識到的文字。
 `
             },
 
             {
               inline_data:{
-                mime_type:"image/jpeg",
-                data:imgData.A
-              }
-            },
-
-            {
-              inline_data:{
-                mime_type:"image/jpeg",
-                data:imgData.B
+                mime_type:'image/jpeg',
+                data:imageBase64
               }
             }
 
@@ -504,7 +445,7 @@ async function runAnalysis(){
 
           temperature:0.1,
 
-          maxOutputTokens:1024
+          maxOutputTokens:512
         }
 
       }),
@@ -517,21 +458,13 @@ async function runAnalysis(){
     const result =
       await response.json();
 
-    console.log(
-      "完整 API 回傳：",
-      result
-    );
-
-    debug.innerText =
-      JSON.stringify(result,null,2);
-
-    debug.style.display='block';
+    console.log(result);
 
     if(!response.ok){
 
       throw new Error(
         result.error?.message ||
-        "API 錯誤"
+        'API 錯誤'
       );
     }
 
@@ -540,7 +473,7 @@ async function runAnalysis(){
       console.error(result);
 
       throw new Error(
-        "Gemma 沒有 candidates"
+        '沒有 candidates'
       );
     }
 
@@ -549,69 +482,32 @@ async function runAnalysis(){
       console.error(result);
 
       throw new Error(
-        "candidates 為空"
+        'candidates 為空'
       );
     }
 
-    const candidate =
-      result.candidates[0];
+    const text =
+      result.candidates?.[0]
+      ?.content?.parts?.[0]
+      ?.text;
 
-    if(!candidate.content){
+    if(!text){
 
-      console.error(candidate);
+      console.error(result);
 
       throw new Error(
-        "Gemma 沒有 content"
+        'Gemma 沒有回傳文字'
       );
     }
 
-    if(!candidate.content.parts){
+    resultDiv.innerText = text;
 
-      console.error(candidate);
-
-      throw new Error(
-        "Gemma 沒有 parts"
-      );
-    }
-
-    if(!candidate.content.parts.length){
-
-      console.error(candidate);
-
-      throw new Error(
-        "parts 為空"
-      );
-    }
-
-    const rawText =
-      candidate.content.parts[0].text;
-
-    if(!rawText){
-
-      console.error(candidate);
-
-      throw new Error(
-        "Gemma 回傳空文字"
-      );
-    }
+    resultDiv.style.display='block';
 
     addLog(
-      "收到模型回應",
-      "log-green"
+      'OCR 完成',
+      'log-green'
     );
-
-    console.log(rawText);
-
-    const data =
-      safeParseJSON(rawText);
-
-    renderTable(data);
-
-    addLog(
-      "分析完成",
-      "log-green"
-    );
-
   }
   catch(err){
 
@@ -620,15 +516,15 @@ async function runAnalysis(){
     if(err.name === 'AbortError'){
 
       addLog(
-        "模型逾時 (240秒)",
-        "log-red"
+        '模型逾時',
+        'log-red'
       );
     }
     else{
 
       addLog(
         err.message,
-        "log-red"
+        'log-red'
       );
     }
   }
@@ -637,48 +533,8 @@ async function runAnalysis(){
     btn.disabled = false;
 
     btn.innerText =
-      "▶ 開始分析";
+      '▶ 開始 OCR';
   }
-}
-
-function renderTable(data){
-
-  const body =
-    document.getElementById('resultBody');
-
-  body.innerHTML = '';
-
-  data.forEach(item=>{
-
-    const isDiff =
-      item.status === 'diff';
-
-    body.innerHTML += `
-
-<tr class="${isDiff ? 'diff':''}">
-
-<td>
-  <strong>${item.beam || ''}</strong>
-</td>
-
-<td>
-  <span class="status-tag ${isDiff ? 'tag-diff':'tag-same'}">
-    ${isDiff ? '差異':'一致'}
-  </span>
-</td>
-
-<td>${item.vA || ''}</td>
-
-<td>${item.vB || ''}</td>
-
-<td>${item.note || ''}</td>
-
-</tr>
-`;
-  });
-
-  document.getElementById('resultTable')
-    .style.display='table';
 }
 
 </script>
