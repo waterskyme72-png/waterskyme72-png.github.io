@@ -3,271 +3,203 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>配筋圖面核對系統 (修復版)</title>
+<title>配筋圖面核對系統 - Gemma 4 專用版</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
     min-height: 100vh;
     background: #0a1628;
-    background-image:
-      linear-gradient(rgba(74,158,255,0.07) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(74,158,255,0.07) 1px, transparent 1px);
+    background-image: linear-gradient(rgba(74,158,255,0.07) 1px, transparent 1px), linear-gradient(90deg, rgba(74,158,255,0.07) 1px, transparent 1px);
     background-size: 40px 40px;
     font-family: 'Courier New', monospace;
     color: #c8deff;
-    padding: 24px 16px;
+    padding: 20px;
   }
-  header { text-align: center; margin-bottom: 28px; border-bottom: 1px solid #1e4d8c; padding-bottom: 18px; }
-  .eyebrow { font-size: 11px; color: #4a9eff; letter-spacing: 4px; margin-bottom: 6px; }
-  h1 { font-size: 22px; font-weight: bold; color: #fff; letter-spacing: 3px; }
-  .sub { font-size: 11px; color: #4a9eff; letter-spacing: 2px; margin-top: 6px; }
-
-  .field { margin-bottom: 18px; }
-  .field-label { font-size: 10px; color: #4a9eff; letter-spacing: 2px; margin-bottom: 7px; text-transform: uppercase; font-weight: bold; }
-  .field-hint { font-size: 10px; color: rgba(200,222,255,0.35); margin-top: 5px; letter-spacing: 1px; }
-
-  input[type="password"], input[type="text"], select {
-    width: 100%; padding: 10px 12px;
-    background: rgba(0,0,0,0.3);
-    border: 1px solid #1e4d8c;
-    border-radius: 4px;
-    color: #c8deff;
-    font-family: 'Courier New', monospace;
-    font-size: 12px;
-    outline: none;
+  header { text-align: center; margin-bottom: 25px; border-bottom: 1px solid #1e4d8c; padding-bottom: 15px; }
+  h1 { font-size: 20px; color: #fff; letter-spacing: 2px; }
+  .field { margin-bottom: 15px; }
+  .field-label { font-size: 11px; color: #4a9eff; font-weight: bold; margin-bottom: 5px; }
+  input[type="password"], select {
+    width: 100%; padding: 10px; background: rgba(0,0,0,0.3);
+    border: 1px solid #1e4d8c; border-radius: 4px; color: #c8deff; font-size: 12px;
   }
-  
-  .key-row { display: flex; gap: 8px; }
-  .key-row input { flex: 1; }
-  .vis-btn {
-    background: none; border: 1px solid #1e4d8c; color: #4a9eff;
-    padding: 0 12px; border-radius: 4px; cursor: pointer;
-    font-family: 'Courier New', monospace; font-size: 11px; white-space: nowrap;
-  }
-
-  .upload-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 18px; }
+  .upload-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; }
   .upload-box {
-    border: 2px dashed #1e4d8c; border-radius: 8px; padding: 16px;
-    text-align: center; cursor: pointer;
-    background: rgba(30,77,140,0.08);
-    min-height: 150px; display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
+    border: 2px dashed #1e4d8c; border-radius: 8px; padding: 15px;
+    text-align: center; cursor: pointer; background: rgba(30,77,140,0.08);
+    min-height: 120px; display: flex; flex-direction: column; align-items: center; justify-content: center;
   }
-  .upload-box:hover, .upload-box.has-img { border-color: #4a9eff; background: rgba(74,158,255,0.08); }
-  .upload-icon { font-size: 28px; margin-bottom: 8px; opacity: 0.5; }
-  .upload-text { font-size: 11px; color: rgba(200,222,255,0.6); }
-  .preview-img { max-width: 100%; max-height: 120px; object-fit: contain; border-radius: 4px; border: 1px solid #1e4d8c; }
-  .clear-btn { background: none; border: none; color: rgba(200,222,255,0.35); cursor: pointer; font-size: 10px; text-decoration: underline; margin-top: 5px; }
-  input[type="file"] { display: none; }
-
+  .preview-img { max-width: 100%; max-height: 100px; border-radius: 4px; margin-bottom: 5px; }
   .go-btn {
-    width: 100%; padding: 14px; background: transparent;
-    border: 2px solid #4a9eff; color: #4a9eff;
-    font-family: 'Courier New', monospace; font-size: 13px;
-    letter-spacing: 3px; cursor: pointer; border-radius: 4px;
-    margin-bottom: 18px; font-weight: bold;
+    width: 100%; padding: 15px; background: #1e4d8c; border: 1px solid #4a9eff;
+    color: #4a9eff; font-weight: bold; cursor: pointer; border-radius: 4px;
   }
-  .go-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-
-  #logWrap { display: none; margin-bottom: 18px; }
+  .go-btn:disabled { opacity: 0.4; cursor: not-allowed; }
   #logBox {
-    background: rgba(0,0,0,0.4); border: 1px solid #1e4d8c;
-    border-radius: 4px; padding: 10px 12px;
-    font-size: 11px; line-height: 1.8;
-    max-height: 180px; overflow-y: auto;
+    background: rgba(0,0,0,0.5); border: 1px solid #1e4d8c; padding: 10px;
+    font-size: 11px; max-height: 150px; overflow-y: auto; margin-top: 15px; border-radius: 4px;
   }
-  .log-ok { color: #c8deff; }
-  .log-error { color: #ff5252; }
-  .log-success { color: #48c774; }
-
-  #resultWrap { display: none; }
-  .tbl-wrap { overflow-x: auto; }
-  table { width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 16px; }
-  th { padding: 8px 10px; background: rgba(30,77,140,0.5); border: 1px solid #1e4d8c; color: #4a9eff; text-align: left; }
-  td { padding: 7px 10px; border: 1px solid rgba(30,77,140,0.4); }
-  .c-diff { color: #ff5252; background: rgba(255,82,82,0.05); }
-
+  .log-err { color: #ff5252; }
+  .log-ok { color: #48c774; }
+  #resultWrap { margin-top: 20px; display: none; }
+  table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  th, td { padding: 8px; border: 1px solid #1e4d8c; text-align: left; }
+  th { background: rgba(74,158,255,0.1); color: #4a9eff; }
+  .diff { color: #ff5252; background: rgba(255,82,82,0.1); }
   @keyframes spin { to { transform: rotate(360deg); } }
-  .spin { display: inline-block; width: 10px; height: 10px; border: 2px solid rgba(255,204,68,0.3); border-top-color: #ffcc44; border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 6px; }
+  .spin { display: inline-block; width: 12px; height: 12px; border: 2px solid #ffcc4433; border-top-color: #ffcc44; border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 8px; vertical-align: middle; }
 </style>
 </head>
 <body>
 
 <header>
-  <div class="eyebrow">STRUCTURAL DRAWING</div>
-  <h1>配筋圖面核對系統</h1>
-  <div class="sub">V1.1 - 修正 Internal Error 問題</div>
+  <h1>配筋圖面核對系統 (Gemma 4 優化版)</h1>
 </header>
 
 <div class="field">
-  <div class="field-label">API Key</div>
-  <div class="key-row">
-    <input type="password" id="apiKey" placeholder="AIza..." oninput="checkReady()">
-    <button class="vis-btn" onclick="toggleVis()">顯示</button>
-  </div>
+  <div class="field-label">API KEY</div>
+  <input type="password" id="apiKey" placeholder="在此輸入 AIza... 金鑰" oninput="checkReady()">
 </div>
 
 <div class="field">
-  <div class="field-label">模型選擇</div>
+  <div class="field-label">目前指定模型</div>
   <select id="model">
-    <option value="gemini-1.5-flash" selected>gemini-1.5-flash (最穩定推薦)</option>
-    <option value="gemini-1.5-flash-8b">gemini-1.5-flash-8b (快)</option>
-    <option value="gemini-2.0-flash">gemini-2.0-flash</option>
+    <option value="gemma-4-26b-a4b-it">Gemma 4 26B (截圖顯示可用)</option>
+    <option value="gemma-4-31b-it">Gemma 4 31B</option>
   </select>
 </div>
 
 <div class="upload-row">
-  <div>
-    <div class="field-label">圖 A（CAD）</div>
-    <div class="upload-box" id="boxA" onclick="document.getElementById('fA').click()">
-      <div id="phA">📤 上傳</div>
-      <div id="pvA" style="display:none;"><img id="imgA" class="preview-img"><button class="clear-btn" onclick="clearFile(event,'A')">移除</button></div>
-    </div>
-    <input type="file" id="fA" accept="image/*" onchange="onFile(event,'A')">
+  <div class="upload-box" onclick="document.getElementById('fA').click()">
+    <div id="phA">圖 A (CAD)</div>
+    <div id="pvA" style="display:none;"><img id="imgA" class="preview-img"></div>
+    <input type="file" id="fA" accept="image/*" onchange="onFile(event,'A')" style="display:none;">
   </div>
-  <div>
-    <div class="field-label">圖 B（照片）</div>
-    <div class="upload-box" id="boxB" onclick="document.getElementById('fB').click()">
-      <div id="phB">📤 上傳</div>
-      <div id="pvB" style="display:none;"><img id="imgB" class="preview-img"><button class="clear-btn" onclick="clearFile(event,'B')">移除</button></div>
-    </div>
-    <input type="file" id="fB" accept="image/*" onchange="onFile(event,'B')">
+  <div class="upload-box" onclick="document.getElementById('fB').click()">
+    <div id="phB">圖 B (照片)</div>
+    <div id="pvB" style="display:none;"><img id="imgB" class="preview-img"></div>
+    <input type="file" id="fB" accept="image/*" onchange="onFile(event,'B')" style="display:none;">
   </div>
 </div>
 
 <button class="go-btn" id="goBtn" onclick="run()" disabled>▶ 開始比對</button>
 
-<div id="logWrap">
-  <div id="logBox"></div>
-</div>
+<div id="logBox" style="display:none;"></div>
 
 <div id="resultWrap">
-  <div class="tbl-wrap">
-    <table>
-      <thead><tr><th>梁編號</th><th>狀態</th><th>圖 A</th><th>圖 B</th><th>備註</th></tr></thead>
-      <tbody id="tbody"></tbody>
-    </table>
-  </div>
+  <table>
+    <thead><tr><th>梁號</th><th>狀態</th><th>圖A</th><th>圖B</th><th>說明</th></tr></thead>
+    <tbody id="tbody"></tbody>
+  </table>
 </div>
 
 <script>
-const S = { b64A:null, mimeA:'image/jpeg', b64B:null, mimeB:'image/jpeg' };
+const S = { b64A:null, b64B:null };
 
-function log(msg, cls='log-ok'){
-  document.getElementById('logWrap').style.display = 'block';
+function log(msg, cls=''){
   const box = document.getElementById('logBox');
-  box.innerHTML += `<div class="${cls}">${msg}</div>`;
+  box.style.display = 'block';
+  box.innerHTML += `<div class="${cls}">[${new Date().toLocaleTimeString()}] ${msg}</div>`;
   box.scrollTop = 999;
 }
 
-function compressImage(file){
-  return new Promise((ok) => {
-    const img = new Image();
-    img.onload = () => {
-      let w = img.width, h = img.height;
-      const MAX = 1600; // 降低解析度以避免 API 負荷過重
-      if(w > MAX || h > MAX){
-        if(w > h){ h = Math.round(h * MAX / w); w = MAX; }
-        else { w = Math.round(w * MAX / h); h = MAX; }
-      }
-      const c = document.createElement('canvas');
-      c.width = w; c.height = h;
-      c.getContext('2d').drawImage(img, 0, 0, w, h);
-      const dataUrl = c.toDataURL('image/jpeg', 0.85);
-      ok({ b64: dataUrl.split(',')[1], mime: 'image/jpeg' });
-    };
-    img.src = URL.createObjectURL(file);
-  });
-}
-
-function loadFile(file, side){
-  compressImage(file).then(r => {
-    if(side === 'A'){ S.b64A = r.b64; S.mimeA = r.mime; document.getElementById('imgA').src = `data:${r.mime};base64,${r.b64}`; }
-    else { S.b64B = r.b64; S.mimeB = r.mime; document.getElementById('imgB').src = `data:${r.mime};base64,${r.b64}`; }
-    document.getElementById('ph'+side).style.display = 'none';
-    document.getElementById('pv'+side).style.display = 'block';
-    checkReady();
-  });
-}
-
-function onFile(e, side){ if(e.target.files[0]) loadFile(e.target.files[0], side); }
-
-function clearFile(e, side){
-  e.stopPropagation();
-  if(side==='A') S.b64A=null; else S.b64B=null;
-  document.getElementById('ph'+side).style.display = 'block';
-  document.getElementById('pv'+side).style.display = 'none';
-  checkReady();
-}
-
-function checkReady(){
+function checkReady() {
   const key = document.getElementById('apiKey').value.trim();
   document.getElementById('goBtn').disabled = !(S.b64A && S.b64B && key);
 }
 
-function toggleVis(){
-  const inp = document.getElementById('apiKey');
-  inp.type = inp.type === 'password' ? 'text' : 'password';
+function onFile(e, side) {
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let w = img.width, h = img.height;
+      if(w > 1800 || h > 1800) {
+        const ratio = Math.min(1800/w, 1800/h);
+        w *= ratio; h *= ratio;
+      }
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+      if(side === 'A') S.b64A = dataUrl.split(',')[1];
+      else S.b64B = dataUrl.split(',')[1];
+      document.getElementById('img'+side).src = dataUrl;
+      document.getElementById('ph'+side).style.display = 'none';
+      document.getElementById('pv'+side).style.display = 'block';
+      checkReady();
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
 }
 
-async function run(){
+async function run() {
   const btn = document.getElementById('goBtn');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spin"></span>AI 分析中...';
+  const key = document.getElementById('apiKey').value.trim();
+  const model = document.getElementById('model').value;
   
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span>連線中...';
   document.getElementById('logBox').innerHTML = '';
   document.getElementById('resultWrap').style.display = 'none';
 
-  const model = document.getElementById('model').value;
-  const key = document.getElementById('apiKey').value.trim();
-  
-  log('正在清理數據並發送請求...');
+  log(`嘗試連線至 Gemma 4 (${model})...`);
 
-  const prompt = "你是一位資深結構工程師。請比對圖A（設計圖）與圖B（現場照片或另一份圖紙）中的配筋數據。重點檢查梁編號、主筋、箍筋。請僅輸出 JSON 格式陣列，格式如下：[{\"beam\":\"梁號\",\"status\":\"same/diff/unclear\",\"versionA\":\"圖A內容\",\"versionB\":\"圖B內容\",\"note\":\"差異\"}]";
+  // 極簡化 Prompt 避免解析錯誤
+  const prompt = "比對圖A與圖B。找出梁編號、主筋、箍筋。輸出 JSON 陣列: [{\"beam\":\"梁號\",\"status\":\"same/diff\",\"versionA\":\"內容A\",\"versionB\":\"內容B\",\"note\":\"備註\"}]";
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
-  
+
   try {
-    const response = await fetch(url, {
+    const resp = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{
           parts: [
             { text: prompt },
-            { inline_data: { mime_type: S.mimeA, data: S.b64A } },
-            { inline_data: { mime_type: S.mimeB, data: S.b64B } }
+            { inline_data: { mime_type: "image/jpeg", data: S.b64A } },
+            { inline_data: { mime_type: "image/jpeg", data: S.b64B } }
           ]
         }],
-        generationConfig: { temperature: 0.1, maxOutputTokens: 2048 }
+        generationConfig: { 
+          temperature: 0.1, 
+          maxOutputTokens: 2048,
+          response_mime_type: "application/json"
+        }
       })
     });
 
-    const data = await response.json();
-    if(!response.ok) throw new Error(data.error?.message || '未知錯誤');
+    const data = await resp.json();
+    if(!resp.ok) throw new Error(data.error?.message || 'API 傳回錯誤');
 
-    const text = data.candidates[0].content.parts[0].text.replace(/```json|```/g, '').trim();
-    const rows = JSON.parse(text);
+    log('✅ 取得資料，解析中...', 'log-ok');
+    const rawText = data.candidates[0].content.parts[0].text;
+    const cleanJson = rawText.replace(/```json|```/g, '').trim();
+    const rows = JSON.parse(cleanJson);
     
-    renderTable(rows);
-    log('✅ 比對完成', 'log-success');
+    render(rows);
   } catch (e) {
-    log('❌ 錯誤: ' + e.message, 'log-error');
+    log('❌ 失敗: ' + e.message, 'log-err');
+    console.error(e);
   } finally {
     btn.disabled = false;
     btn.innerHTML = '▶ 開始比對';
   }
 }
 
-function renderTable(rows){
+function render(rows) {
   const tbody = document.getElementById('tbody');
   tbody.innerHTML = rows.map(r => `
-    <tr>
+    <tr class="${r.status !== 'same' ? 'diff' : ''}">
       <td>${r.beam}</td>
-      <td style="color:${r.status==='same'?'#48c774':'#ff5252'}">${r.status.toUpperCase()}</td>
-      <td class="${r.status!=='same'?'c-diff':''}">${r.versionA}</td>
-      <td class="${r.status!=='same'?'c-diff':''}">${r.versionB}</td>
-      <td>${r.note}</td>
+      <td>${r.status === 'same' ? '一致' : '差異'}</td>
+      <td>${r.versionA}</td>
+      <td>${r.versionB}</td>
+      <td>${r.note || ''}</td>
     </tr>
   `).join('');
   document.getElementById('resultWrap').style.display = 'block';
