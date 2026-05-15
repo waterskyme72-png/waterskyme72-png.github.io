@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>API 測試對話框</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    min-height: 100vh;
+    background: #0a1628;
+    background-image:
+      linear-gradient(rgba(74,158,255,0.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(74,158,255,0.07) 1px, transparent 1px);
+    background-size: 40px 40px;
+    font-family: 'Courier New', monospace;
+    color: #c8deff;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    padding: 16px;
+  }
+
+  header {
+    text-align: center;
+    padding-bottom: 14px;
+    border-bottom: 1px solid #1e4d8c;
+    margin-bottom: 14px;
+    flex-shrink: 0;
+  }
+  header h1 { font-size: 16px; color: #fff; letter-spacing: 2px; }
+  header .sub { font-size: 10px; color: #4a9eff; letter-spacing: 2px; margin-top: 4px; }
+
+  .config { display: flex; gap: 8px; margin-bottom: 12px; flex-shrink: 0; }
+  .config input, .config select {
+    flex: 1; padding: 8px 10px;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid #1e4d8c;
+    border-radius: 4px;
+    color: #c8deff;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    outline: none;
+  }
+  .config select { flex: 0 0 auto; min-width: 80px; }
+  .vis-btn {
+    background: none; border: 1px solid #1e4d8c; color: #4a9eff;
+    padding: 0 10px; border-radius: 4px; cursor: pointer;
+    font-family: 'Courier New', monospace; font-size: 11px;
+    flex-shrink: 0;
+  }
+
+  /* Token bar */
+  #tokenBar {
+    display: flex; gap: 10px; align-items: center;
+    padding: 6px 10px; background: rgba(0,0,0,0.25);
+    border: 1px solid #1e4d8c; border-radius: 4px;
+    margin-bottom: 10px; font-size: 10px;
+    flex-shrink: 0; flex-wrap: wrap;
+  }
+  .tk { color: rgba(200,222,255,0.5); }
+  .tk span { color: #4a9eff; font-weight: bold; }
+  #statusDot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #1e4d8c; flex-shrink: 0;
+    transition: background 0.3s;
+  }
+  #statusDot.active { background: #48c774; }
+  #statusDot.streaming { background: #ffcc44; animation: pulse 0.6s infinite alternate; }
+  #statusDot.error { background: #ff5252; }
+  @keyframes pulse { to { opacity: 0.3; } }
+
+  /* Chat window */
+  #chat {
+    flex: 1;
+    overflow-y: auto;
+    border: 1px solid #1e4d8c;
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 10px;
+    background: rgba(0,0,0,0.2);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .msg {
+    max-width: 88%;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    line-height: 1.6;
+    word-break: break-word;
+    white-space: pre-wrap;
+  }
+  .msg-user {
+    align-self: flex-end;
+    background: rgba(74,158,255,0.15);
+    border: 1px solid rgba(74,158,255,0.3);
+    color: #c8deff;
+  }
+  .msg-ai {
+    align-self: flex-start;
+    background: rgba(30,77,140,0.2);
+    border: 1px solid #1e4d8c;
+    color: #c8deff;
+  }
+  .msg-ai.streaming { border-color: #ffcc44; }
+  .msg-label {
+    font-size: 9px; letter-spacing: 1px; margin-bottom: 4px;
+    opacity: 0.5; text-transform: uppercase;
+  }
+  .cursor { display: inline-block; width: 6px; height: 12px; background: #ffcc44; animation: blink 0.8s infinite; vertical-align: middle; margin-left: 2px; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .empty-hint { color: rgba(200,222,255,0.25); font-size: 11px; text-align: center; margin: auto; }
+
+  /* Input row */
+  .input-row { display: flex; gap: 8px; flex-shrink: 0; }
+  #msgInput {
+    flex: 1; padding: 10px 12px;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid #1e4d8c;
+    border-radius: 4px;
+    color: #c8deff;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    outline: none;
+    resize: none;
+    height: 42px;
+    line-height: 1.4;
+  }
+  #msgInput:focus { border-color: #4a9eff; }
+  .send-btn {
+    padding: 0 16px;
+    background: transparent;
+    border: 2px solid #4a9eff;
+    color: #4a9eff;
+    font-family: 'Courier New', monospace;
+    font-size: 13px; cursor: pointer;
+    border-radius: 4px; transition: all 0.2s;
+    flex-shrink: 0;
+  }
+  .send-btn:hover:not(:disabled) { background: rgba(74,158,255,0.12); }
+  .send-btn:disabled { opacity: 0.3; cursor: not-allowed; border-color: #1e4d8c; color: #1e4d8c; }
+  .clear-btn-sm {
+    padding: 0 10px;
+    background: transparent;
+    border: 1px solid #1e4d8c;
+    color: rgba(200,222,255,0.4);
+    font-family: 'Courier New', monospace;
+    font-size: 11px; cursor: pointer;
+    border-radius: 4px;
+    flex-shrink: 0;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>API 測試對話框</h1>
+  <div class="sub">GEMINI / GEMMA STREAMING CHAT TEST</div>
+</header>
+
+<div class="config">
+  <input type="password" id="apiKey" placeholder="API Key (AIza...)" oninput="checkReady()">
+  <button class="vis-btn" onclick="toggleVis()">顯示</button>
+</div>
+<div class="config">
+  <select id="model">
+    <option value="gemma-4-26b-a4b-it" selected>gemma-4-26b-a4b-it</option>
+    <option value="gemma-4-31b-it">gemma-4-31b-it</option>
+    <option value="gemini-1.5-flash">gemini-1.5-flash</option>
+    <option value="gemini-1.5-flash-8b">gemini-1.5-flash-8b</option>
+    <option value="gemini-2.0-flash">gemini-2.0-flash</option>
+  </select>
+</div>
+
+<div id="tokenBar">
+  <div id="statusDot"></div>
+  <div class="tk">輸入 <span id="inTok">0</span> tok</div>
+  <div class="tk">輸出 <span id="outTok">0</span> tok</div>
+  <div class="tk">本次 <span id="thisTok">0</span> 字元</div>
+  <div class="tk">耗時 <span id="elapsed">0</span>s</div>
+  <div id="statusTxt" style="font-size:10px;color:rgba(200,222,255,0.4);margin-left:auto;">待機</div>
+</div>
+
+<div id="chat">
+  <div class="empty-hint" id="emptyHint">輸入訊息測試 API 連線與回應</div>
+</div>
+
+<div class="input-row">
+  <textarea id="msgInput" placeholder="輸入訊息... (Enter 送出)" onkeydown="onKey(event)" oninput="checkReady()"></textarea>
+  <button class="send-btn" id="sendBtn" onclick="send()" disabled>▶</button>
+  <button class="clear-btn-sm" onclick="clearChat()">清除</button>
+</div>
+
+<script>
+var history = [];
+var totalIn = 0, totalOut = 0;
+var sending = false;
+
+function g(id){ return document.getElementById(id); }
+
+function checkReady(){
+  var key = g('apiKey').value.trim();
+  var msg = g('msgInput').value.trim();
+  g('sendBtn').disabled = !(key && msg && !sending);
+}
+
+function toggleVis(){
+  var inp = g('apiKey');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+  event.target.textContent = inp.type === 'password' ? '顯示' : '隱藏';
+}
+
+function setStatus(s, txt){
+  var dot = g('statusDot');
+  dot.className = s;
+  g('statusTxt').textContent = txt;
+}
+
+function onKey(e){
+  if(e.key === 'Enter' && !e.shiftKey){
+    e.preventDefault();
+    if(!g('sendBtn').disabled) send();
+  }
+}
+
+function addMsg(role, text, id){
+  g('emptyHint') && g('emptyHint').remove();
+  var wrap = document.createElement('div');
+  wrap.className = 'msg msg-' + role;
+  if(id) wrap.id = id;
+  var label = document.createElement('div');
+  label.className = 'msg-label';
+  label.textContent = role === 'user' ? '你' : g('model').value;
+  wrap.appendChild(label);
+  var body = document.createElement('div');
+  body.className = 'msg-body';
+  body.textContent = text;
+  wrap.appendChild(body);
+  g('chat').appendChild(wrap);
+  g('chat').scrollTop = 9999;
+  return wrap;
+}
+
+function clearChat(){
+  history = [];
+  totalIn = 0; totalOut = 0;
+  g('inTok').textContent = '0';
+  g('outTok').textContent = '0';
+  g('thisTok').textContent = '0';
+  g('elapsed').textContent = '0';
+  g('chat').innerHTML = '<div class="empty-hint" id="emptyHint">輸入訊息測試 API 連線與回應</div>';
+  setStatus('', '待機');
+}
+
+function send(){
+  var key = g('apiKey').value.trim();
+  var text = g('msgInput').value.trim();
+  if(!key || !text || sending) return;
+
+  sending = true;
+  g('sendBtn').disabled = true;
+  g('msgInput').value = '';
+  checkReady();
+
+  addMsg('user', text);
+  history.push({ role: 'user', parts: [{ text: text }] });
+
+  // AI bubble
+  var aiBubble = addMsg('ai', '');
+  aiBubble.classList.add('streaming');
+  var body = aiBubble.querySelector('.msg-body');
+  body.innerHTML = '<span class="cursor"></span>';
+
+  var model = g('model').value;
+  var url = 'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':streamGenerateContent?key=' + key + '&alt=sse';
+  var reqBody = JSON.stringify({
+    contents: history,
+    generationConfig: { maxOutputTokens: 2000, temperature: 0.7 }
+  });
+
+  var t0 = Date.now();
+  var aiText = '';
+  var buf = '';
+
+  setStatus('streaming', '串流中...');
+
+  var elapsedTimer = setInterval(function(){
+    g('elapsed').textContent = ((Date.now() - t0) / 1000).toFixed(1);
+  }, 100);
+
+  fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: reqBody })
+    .then(function(res){
+      if(!res.ok){
+        return res.json().then(function(d){
+          throw new Error('HTTP ' + res.status + ': ' + ((d.error && d.error.message) || res.statusText));
+        });
+      }
+      var reader = res.body.getReader();
+      var decoder = new TextDecoder();
+
+      function read(){
+        return reader.read().then(function(chunk){
+          if(chunk.done) return;
+          buf += decoder.decode(chunk.value, { stream: true });
+          var lines = buf.split('\n');
+          buf = lines.pop();
+          lines.forEach(function(line){
+            if(!line.startsWith('data: ')) return;
+            var json = line.slice(6).trim();
+            if(!json || json === '[DONE]') return;
+            try {
+              var obj = JSON.parse(json);
+              // token counts
+              if(obj.usageMetadata){
+                var m = obj.usageMetadata;
+                if(m.promptTokenCount)     { totalIn  += m.promptTokenCount;  g('inTok').textContent  = totalIn;  }
+                if(m.candidatesTokenCount) { totalOut += m.candidatesTokenCount; g('outTok').textContent = totalOut; }
+              }
+              var parts = obj.candidates && obj.candidates[0] && obj.candidates[0].content && obj.candidates[0].content.parts;
+              if(parts){
+                parts.forEach(function(p){
+                  if(p.text){
+                    aiText += p.text;
+                    g('thisTok').textContent = aiText.length;
+                    body.textContent = aiText;
+                    g('chat').scrollTop = 9999;
+                  }
+                });
+              }
+            } catch(e){}
+          });
+          return read();
+        });
+      }
+      return read();
+    })
+    .then(function(){
+      clearInterval(elapsedTimer);
+      if(!aiText){
+        body.textContent = '⚠ 回應為空';
+        setStatus('error', '回應為空');
+      } else {
+        aiBubble.classList.remove('streaming');
+        setStatus('active', '完成');
+        history.push({ role: 'model', parts: [{ text: aiText }] });
+      }
+    })
+    .catch(function(e){
+      clearInterval(elapsedTimer);
+      body.textContent = '❌ ' + e.message;
+      aiBubble.classList.remove('streaming');
+      setStatus('error', '錯誤');
+    })
+    .finally(function(){
+      clearInterval(elapsedTimer);
+      g('elapsed').textContent = ((Date.now() - t0) / 1000).toFixed(1);
+      sending = false;
+      checkReady();
+    });
+}
+</script>
+</body>
+</html>
