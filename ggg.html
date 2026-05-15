@@ -3,220 +3,215 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>梁配筋圖面核對系統 (Gemma 4 穩定版)</title>
+<title>梁配筋核對系統 - Gemma 4 修正版</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
-    min-height: 100vh;
-    background: #0a1628;
-    background-image: linear-gradient(rgba(74,158,255,0.07) 1px, transparent 1px), linear-gradient(90deg, rgba(74,158,255,0.07) 1px, transparent 1px);
-    background-size: 40px 40px;
-    font-family: 'Courier New', monospace;
-    color: #c8deff;
-    padding: 20px;
-    line-height: 1.5;
+    background: #0a1628; color: #c8deff; font-family: monospace; padding: 20px;
+    background-image: linear-gradient(rgba(74,158,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(74,158,255,0.05) 1px, transparent 1px);
+    background-size: 30px 30px;
   }
-  header { text-align: center; margin-bottom: 20px; border-bottom: 1px solid #1e4d8c; padding-bottom: 15px; }
-  h1 { font-size: 20px; color: #fff; letter-spacing: 2px; }
-  .field { margin-bottom: 15px; }
-  .field-label { font-size: 11px; color: #4a9eff; font-weight: bold; margin-bottom: 5px; text-transform: uppercase; }
-  input[type="password"], select {
-    width: 100%; padding: 12px; background: rgba(0,0,0,0.4);
-    border: 1px solid #1e4d8c; border-radius: 4px; color: #c8deff; font-size: 13px; outline: none;
+  .container { max-width: 800px; margin: 0 auto; }
+  header { text-align: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #1e4d8c; }
+  .input-group { margin-bottom: 15px; }
+  label { display: block; font-size: 11px; color: #4a9eff; margin-bottom: 5px; font-weight: bold; }
+  input, select { width: 100%; padding: 12px; background: #000; border: 1px solid #1e4d8c; color: #fff; border-radius: 4px; }
+  .upload-area { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; }
+  .drop-zone {
+    border: 2px dashed #1e4d8c; height: 120px; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; background: rgba(30,77,140,0.1); border-radius: 8px; text-align: center;
   }
-  .upload-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
-  .upload-box {
-    border: 2px dashed #1e4d8c; border-radius: 8px; padding: 20px;
-    text-align: center; cursor: pointer; background: rgba(30,77,140,0.1);
-    min-height: 140px; display: flex; flex-direction: column; align-items: center; justify-content: center;
-    transition: 0.2s;
+  .preview { max-width: 100%; max-height: 80px; display: none; margin-top: 5px; border: 1px solid #4a9eff; }
+  .btn-run {
+    width: 100%; padding: 15px; background: transparent; border: 2px solid #4a9eff;
+    color: #4a9eff; font-weight: bold; cursor: pointer; border-radius: 4px; font-size: 16px;
   }
-  .upload-box:hover { border-color: #4a9eff; background: rgba(74,158,255,0.1); }
-  .preview-img { max-width: 100%; max-height: 110px; border-radius: 4px; border: 1px solid #1e4d8c; margin-bottom: 8px; }
-  .go-btn {
-    width: 100%; padding: 16px; background: transparent; border: 2px solid #4a9eff;
-    color: #4a9eff; font-weight: bold; cursor: pointer; border-radius: 4px;
-    font-size: 14px; letter-spacing: 2px;
+  .btn-run:disabled { opacity: 0.3; cursor: not-allowed; }
+  #statusLog {
+    margin-top: 15px; background: #000; border: 1px solid #1e4d8c; padding: 10px;
+    font-size: 12px; max-height: 200px; overflow-y: auto; color: #aaa;
   }
-  .go-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-  #logBox {
-    background: rgba(0,0,0,0.6); border: 1px solid #1e4d8c; padding: 12px;
-    font-size: 11px; max-height: 200px; overflow-y: auto; margin-top: 20px; border-radius: 4px;
-  }
-  .log-err { color: #ff5252; }
-  .log-ok { color: #48c774; }
-  #resultWrap { margin-top: 25px; display: none; }
-  .tbl-wrap { overflow-x: auto; }
-  table { width: 100%; border-collapse: collapse; font-size: 12px; background: rgba(0,0,0,0.2); }
-  th, td { padding: 10px; border: 1px solid #1e4d8c; text-align: left; }
-  th { background: rgba(30,77,140,0.5); color: #4a9eff; font-size: 11px; }
-  .diff-row { color: #ff5252; background: rgba(255,82,82,0.05); }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .spin { display: inline-block; width: 14px; height: 14px; border: 2px solid #ffcc4433; border-top-color: #ffcc44; border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 10px; vertical-align: middle; }
+  .log-blue { color: #4a9eff; }
+  .log-red { color: #ff5252; }
+  .log-green { color: #48c774; }
+  table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 12px; display: none; }
+  th, td { border: 1px solid #1e4d8c; padding: 10px; text-align: left; }
+  th { background: rgba(74,158,255,0.1); color: #4a9eff; }
+  .diff { background: rgba(255,82,82,0.1); color: #ff8888; }
 </style>
 </head>
 <body>
 
-<header>
-  <h1>配筋圖面核對系統 (Gemma 4 專用版)</h1>
-</header>
+<div class="container">
+  <header><h1>梁配筋核對 (Gemma 4 穩定版)</h1></header>
 
-<div class="field">
-  <div class="field-label">API KEY (Google AI Studio)</div>
-  <input type="password" id="apiKey" placeholder="在此輸入 AIza... 金鑰" oninput="checkReady()">
-</div>
-
-<div class="field">
-  <div class="field-label">模型選擇</div>
-  <select id="model">
-    <option value="gemma-4-26b-a4b-it">Gemma 4 26B (26B-A4B-IT)</option>
-    <option value="gemma-4-31b-it">Gemma 4 31B (Dense-IT)</option>
-  </select>
-</div>
-
-<div class="upload-row">
-  <div class="upload-box" onclick="document.getElementById('fA').click()">
-    <div id="phA">📐 圖 A (CAD)</div>
-    <div id="pvA" style="display:none;"><img id="imgA" class="preview-img"></div>
-    <input type="file" id="fA" accept="image/*" onchange="onFile(event,'A')" style="display:none;">
+  <div class="input-group">
+    <label>GOOGLE AI API KEY</label>
+    <input type="password" id="apiKey" placeholder="輸入 API Key..." oninput="checkValid()">
   </div>
-  <div class="upload-box" onclick="document.getElementById('fB').click()">
-    <div id="phB">📷 圖 B (照片)</div>
-    <div id="pvB" style="display:none;"><img id="imgB" class="preview-img"></div>
-    <input type="file" id="fB" accept="image/*" onchange="onFile(event,'B')" style="display:none;">
+
+  <div class="input-group">
+    <label>模型名稱</label>
+    <select id="modelName">
+      <option value="gemma-4-26b-a4b-it">gemma-4-26b-a4b-it (截圖流量型)</option>
+      <option value="gemma-4-31b-it">gemma-4-31b-it</option>
+      <option value="gemini-1.5-flash">gemini-1.5-flash (備用穩定型)</option>
+    </select>
   </div>
-</div>
 
-<button class="go-btn" id="goBtn" onclick="run()" disabled>▶ 開始比對</button>
-
-<div id="logBox" style="display:none;"></div>
-
-<div id="resultWrap">
-  <div class="tbl-wrap">
-    <table>
-      <thead><tr><th>梁號</th><th>狀態</th><th>圖 A (CAD)</th><th>圖 B (現場)</th><th>差異說明</th></tr></thead>
-      <tbody id="tbody"></tbody>
-    </table>
+  <div class="upload-area">
+    <div class="drop-zone" onclick="document.getElementById('fileA').click()">
+      <div id="textA">圖 A (CAD)</div>
+      <img id="prevA" class="preview">
+      <input type="file" id="fileA" hidden accept="image/*" onchange="handleFile(this, 'A')">
+    </div>
+    <div class="drop-zone" onclick="document.getElementById('fileB').click()">
+      <div id="textB">圖 B (現場)</div>
+      <img id="prevB" class="preview">
+      <input type="file" id="fileB" hidden accept="image/*" onchange="handleFile(this, 'B')">
+    </div>
   </div>
+
+  <button id="runBtn" class="btn-run" onclick="startAnalysis()" disabled>開始 AI 比對分析</button>
+
+  <div id="statusLog">準備就緒，請上傳圖檔...</div>
+
+  <table id="resultTable">
+    <thead>
+      <tr><th>梁號</th><th>狀態</th><th>圖A</th><th>圖B</th><th>差異</th></tr>
+    </thead>
+    <tbody id="resultBody"></tbody>
+  </table>
 </div>
 
 <script>
-const S = { b64A:null, b64B:null };
+let imgData = { A: null, B: null };
 
-function log(msg, cls=''){
-  const box = document.getElementById('logBox');
-  box.style.display = 'block';
-  box.innerHTML += `<div class="${cls}">[${new Date().toLocaleTimeString('zh-TW', {hour12:false})}] ${msg}</div>`;
-  box.scrollTop = 9999;
+function addLog(msg, cls = '') {
+  const log = document.getElementById('statusLog');
+  const t = new Date().toLocaleTimeString();
+  log.innerHTML += `<div class="${cls}">[${t}] ${msg}</div>`;
+  log.scrollTop = log.scrollHeight;
 }
 
-function checkReady() {
+function checkValid() {
   const key = document.getElementById('apiKey').value.trim();
-  document.getElementById('goBtn').disabled = !(S.b64A && S.b64B && key);
+  document.getElementById('runBtn').disabled = !(imgData.A && imgData.B && key);
 }
 
-function processImage(file, side) {
+function handleFile(input, side) {
+  const file = input.files[0];
+  if (!file) return;
+  addLog(`讀取圖檔 ${side}...`);
+  
   const reader = new FileReader();
   reader.onload = (e) => {
     const img = new Image();
     img.onload = () => {
       const canvas = document.createElement('canvas');
       let w = img.width, h = img.height;
-      const MAX = 1200; // 降低解析度以避免 400 錯誤並加快反應
-      if(w > MAX || h > MAX) {
-        const ratio = Math.min(MAX/w, MAX/h);
-        w *= ratio; h *= ratio;
+      const MAX = 1024; // 強制縮小解析度避免傳輸卡住
+      if (w > MAX || h > MAX) {
+        const r = Math.min(MAX/w, MAX/h);
+        w *= r; h *= r;
       }
       canvas.width = w; canvas.height = h;
-      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.85); // 使用高品質 JPEG
-      if(side === 'A') S.b64A = dataUrl.split(',')[1];
-      else S.b64B = dataUrl.split(',')[1];
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
       
-      document.getElementById('img'+side).src = dataUrl;
-      document.getElementById('ph'+side).style.display = 'none';
-      document.getElementById('pv'+side).style.display = 'block';
-      checkReady();
+      const base64 = canvas.toDataURL('image/jpeg', 0.8);
+      imgData[side] = base64.split(',')[1];
+      
+      const prev = document.getElementById('prev' + side);
+      prev.src = base64;
+      prev.style.display = 'block';
+      document.getElementById('text' + side).style.display = 'none';
+      addLog(`圖檔 ${side} 處理完成 (${w}x${h})`, 'log-green');
+      checkValid();
     };
     img.src = e.target.result;
   };
   reader.readAsDataURL(file);
 }
 
-function onFile(e, side) { if(e.target.files[0]) processImage(e.target.files[0], side); }
-
-async function run() {
-  const btn = document.getElementById('goBtn');
-  const key = document.getElementById('apiKey').value.trim();
-  const modelId = document.getElementById('model').value;
+async function startAnalysis() {
+  const btn = document.getElementById('runBtn');
+  const apiKey = document.getElementById('apiKey').value.trim();
+  const model = document.getElementById('modelName').value;
   
   btn.disabled = true;
-  btn.innerHTML = '<span class="spin"></span>正在核對圖面...';
-  document.getElementById('logBox').innerHTML = '';
-  document.getElementById('resultWrap').style.display = 'none';
+  btn.innerText = "⏳ 執行中...";
+  document.getElementById('resultTable').style.display = 'none';
+  addLog("--- 開始比對流程 ---", "log-blue");
 
-  log(`🚀 發送請求至模型: ${modelId}`);
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 60000); // 60秒超時
 
-  const prompt = "請仔細比對圖A（CAD設計）與圖B（現場照片）中的梁配筋表。提取所有梁編號，並比對其主筋與箍筋規格。請嚴格輸出 JSON 陣列，格式如下：[{\"beam\":\"梁號\",\"status\":\"same/diff\",\"versionA\":\"圖A內容\",\"versionB\":\"圖B內容\",\"note\":\"差異點\"}]";
-
-  // 確保路徑格式正確 (v1beta/models/...)
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${key}`;
+  const payload = {
+    contents: [{
+      parts: [
+        { text: "比對兩張圖的梁配筋表。找出所有梁編號並核對主筋與箍筋。請僅輸出 JSON 格式：[{\"beam\":\"號碼\",\"status\":\"same/diff\",\"vA\":\"設計\",\"vB\":\"現場\",\"note\":\"說明\"}]" },
+        { inline_data: { mime_type: "image/jpeg", data: imgData.A } },
+        { inline_data: { mime_type: "image/jpeg", data: imgData.B } }
+      ]
+    }],
+    generationConfig: { temperature: 0.1, maxOutputTokens: 2048 }
+  };
 
   try {
-    const resp = await fetch(url, {
+    addLog("正在上傳數據至 Google API...", "log-blue");
+    const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{
-          parts: [
-            { text: prompt },
-            { inline_data: { mime_type: "image/jpeg", data: S.b64A } },
-            { inline_data: { mime_type: "image/jpeg", data: S.b64B } }
-          ]
-        }],
-        generationConfig: { 
-          temperature: 0.1, 
-          maxOutputTokens: 2048,
-          response_mime_type: "application/json" 
-        }
-      })
+      body: JSON.stringify(payload),
+      signal: controller.signal
     });
 
-    const data = await resp.json();
-    if(!resp.ok) {
-        const errorMsg = data.error?.message || '未知錯誤';
-        throw new Error(`[${resp.status}] ${errorMsg}`);
+    clearTimeout(timeoutId);
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error?.message || "API 連線失敗");
     }
 
-    log('✅ 數據接收成功，正在解析表格...', 'log-ok');
+    addLog("✅ 收到 AI 回應，正在解析...", "log-green");
+    const aiText = result.candidates[0].content.parts[0].text;
+    const jsonStr = aiText.replace(/```json|```/g, "").trim();
+    const data = JSON.parse(jsonStr);
     
-    let rawText = data.candidates[0].content.parts[0].text;
-    // 去除 Markdown 代碼塊標籤
-    const cleanJson = rawText.replace(/```json|```/g, '').trim();
-    const rows = JSON.parse(cleanJson);
-    
-    render(rows);
-  } catch (e) {
-    log(`❌ 失敗: ${e.message}`, 'log-err');
-    if(e.message.includes('404')) log('提示：請確認您的 API Key 是否具備該模型的存取權限。', 'log-err');
+    renderTable(data);
+    addLog("任務成功完成", "log-green");
+
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      addLog("❌ 錯誤：API 回應超時 (60秒)，請嘗試換小一點的圖或改用 Gemini 1.5 Flash", "log-red");
+    } else {
+      addLog(`❌ 錯誤：${err.message}`, "log-red");
+      console.error(err);
+    }
   } finally {
     btn.disabled = false;
-    btn.innerHTML = '▶ 開始比對';
+    btn.innerText = "開始 AI 比對分析";
   }
 }
 
-function render(rows) {
-  const tbody = document.getElementById('tbody');
-  tbody.innerHTML = rows.map(r => `
-    <tr class="${r.status !== 'same' ? 'diff-row' : ''}">
-      <td><strong>${r.beam}</strong></td>
-      <td>${r.status === 'same' ? '✅ 一致' : '❌ 差異'}</td>
-      <td>${r.versionA}</td>
-      <td>${r.versionB}</td>
-      <td>${r.note || ''}</td>
-    </tr>
-  `).join('');
-  document.getElementById('resultWrap').style.display = 'block';
+function renderTable(data) {
+  const body = document.getElementById('resultBody');
+  body.innerHTML = "";
+  data.forEach(item => {
+    const isDiff = item.status !== 'same';
+    const row = `<tr class="${isDiff ? 'diff' : ''}">
+      <td>${item.beam}</td>
+      <td>${isDiff ? '差異' : '相同'}</td>
+      <td>${item.vA}</td>
+      <td>${item.vB}</td>
+      <td>${item.note || ''}</td>
+    </tr>`;
+    body.innerHTML += row;
+  });
+  document.getElementById('resultTable').style.display = 'table';
 }
 </script>
 </body>
