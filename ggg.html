@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>配筋圖面核對系統</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    min-height: 100vh;
+    background: #0a1628;
+    background-image:
+      linear-gradient(rgba(74,158,255,0.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(74,158,255,0.07) 1px, transparent 1px);
+    background-size: 40px 40px;
+    font-family: 'Courier New', monospace;
+    color: #c8deff;
+    padding: 24px 16px;
+  }
+  header { text-align: center; margin-bottom: 28px; border-bottom: 1px solid #1e4d8c; padding-bottom: 18px; }
+  .eyebrow { font-size: 11px; color: #4a9eff; letter-spacing: 4px; margin-bottom: 6px; }
+  h1 { font-size: 22px; font-weight: bold; color: #fff; letter-spacing: 3px; }
+  .sub { font-size: 11px; color: #4a9eff; letter-spacing: 2px; margin-top: 6px; }
+
+  .field { margin-bottom: 18px; }
+  .field-label { font-size: 10px; color: #4a9eff; letter-spacing: 2px; margin-bottom: 7px; text-transform: uppercase; font-weight: bold; }
+  .field-hint { font-size: 10px; color: rgba(200,222,255,0.35); margin-top: 5px; letter-spacing: 1px; }
+
+  input[type="password"], input[type="text"], select {
+    width: 100%; padding: 10px 12px;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid #1e4d8c;
+    border-radius: 4px;
+    color: #c8deff;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    outline: none;
+  }
+  select option, select optgroup { background: #0d1f3c; color: #c8deff; }
+
+  .key-row { display: flex; gap: 8px; }
+  .key-row input { flex: 1; }
+  .vis-btn {
+    background: none; border: 1px solid #1e4d8c; color: #4a9eff;
+    padding: 0 12px; border-radius: 4px; cursor: pointer;
+    font-family: 'Courier New', monospace; font-size: 11px; white-space: nowrap;
+  }
+
+  .upload-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 18px; }
+  .upload-box {
+    border: 2px dashed #1e4d8c; border-radius: 8px; padding: 16px;
+    text-align: center; cursor: pointer;
+    background: rgba(30,77,140,0.08);
+    min-height: 150px; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .upload-box:hover, .upload-box.has-img { border-color: #4a9eff; background: rgba(74,158,255,0.08); }
+  .upload-icon { font-size: 28px; margin-bottom: 8px; opacity: 0.5; }
+  .upload-text { font-size: 11px; color: rgba(200,222,255,0.6); }
+  .upload-hint-sm { font-size: 10px; color: rgba(200,222,255,0.3); margin-top: 4px; }
+  .preview-img { max-width: 100%; max-height: 120px; object-fit: contain; border-radius: 4px; border: 1px solid #1e4d8c; }
+  .clear-btn { background: none; border: none; color: rgba(200,222,255,0.35); cursor: pointer; font-size: 10px; font-family: 'Courier New', monospace; text-decoration: underline; margin-top: 5px; }
+  input[type="file"] { display: none; }
+
+  .go-btn {
+    width: 100%; padding: 14px; background: transparent;
+    border: 2px solid #4a9eff; color: #4a9eff;
+    font-family: 'Courier New', monospace; font-size: 13px;
+    letter-spacing: 3px; text-transform: uppercase;
+    cursor: pointer; border-radius: 4px; transition: all 0.2s;
+    margin-bottom: 18px; font-weight: bold;
+  }
+  .go-btn:hover:not(:disabled) { background: rgba(74,158,255,0.1); }
+  .go-btn:disabled { opacity: 0.3; cursor: not-allowed; border-color: #1e4d8c; color: #1e4d8c; }
+  .go-btn.running { border-color: #ffcc44; color: #ffcc44; }
+
+  #logWrap { display: none; margin-bottom: 18px; }
+  .log-title { font-size: 10px; color: #4a9eff; letter-spacing: 2px; margin-bottom: 6px; }
+  #logBox {
+    background: rgba(0,0,0,0.4); border: 1px solid #1e4d8c;
+    border-radius: 4px; padding: 10px 12px;
+    font-size: 11px; line-height: 1.9;
+    max-height: 180px; overflow-y: auto;
+  }
+  .log-ok      { color: #c8deff; }
+  .log-success { color: #48c774; }
+  .log-error   { color: #ff5252; }
+  .log-warn    { color: #ffc107; }
+
+  #resultWrap { display: none; }
+  .result-title { font-size: 11px; letter-spacing: 2px; color: #4a9eff; margin-bottom: 12px; border-bottom: 1px solid #1e4d8c; padding-bottom: 8px; }
+  .badges { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+  .badge { padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: bold; letter-spacing: 1px; }
+  .b-ok  { background: rgba(72,199,116,0.15); border: 1px solid rgba(72,199,116,0.5); color: #48c774; }
+  .b-diff{ background: rgba(255,82,82,0.15);  border: 1px solid rgba(255,82,82,0.5);  color: #ff5252; }
+  .b-unk { background: rgba(255,193,7,0.15);  border: 1px solid rgba(255,193,7,0.5);  color: #ffc107; }
+
+  .tbl-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 16px; }
+  th { padding: 8px 10px; background: rgba(30,77,140,0.5); border: 1px solid #1e4d8c; color: #4a9eff; font-size: 10px; text-align: left; letter-spacing: 1px; text-transform: uppercase; }
+  td { padding: 7px 10px; border: 1px solid rgba(30,77,140,0.4); vertical-align: top; line-height: 1.5; }
+  tr:hover td { background: rgba(74,158,255,0.04); }
+  .c-beam { color: #fff; font-weight: bold; white-space: nowrap; }
+  .c-ok   { background: rgba(72,199,116,0.05); color: #48c774; }
+  .c-diff { background: rgba(255,82,82,0.08);  color: #ff5252; }
+  .c-unk  { background: rgba(255,193,7,0.07);  color: #ffc107; }
+  .c-note { color: rgba(200,222,255,0.5); font-size: 10px; }
+
+  .alert { padding: 11px 14px; border-radius: 4px; font-size: 11px; margin-bottom: 12px; }
+  .alert-diff { background: rgba(255,82,82,0.07);  border: 1px solid rgba(255,82,82,0.3);  color: #ff8888; }
+  .alert-ok   { background: rgba(72,199,116,0.07); border: 1px solid rgba(72,199,116,0.3); color: #48c774; }
+
+  .raw-wrap { margin-top: 16px; border-top: 1px solid #1e4d8c; padding-top: 14px; }
+  .raw-toggle { background: none; border: none; color: rgba(200,222,255,0.35); cursor: pointer; font-size: 10px; font-family: 'Courier New', monospace; text-decoration: underline; }
+  #rawBox { display: none; margin-top: 10px; background: rgba(0,0,0,0.3); border: 1px solid #1e4d8c; border-radius: 4px; padding: 12px; font-size: 10px; color: rgba(200,222,255,0.6); white-space: pre-wrap; line-height: 1.7; max-height: 280px; overflow-y: auto; font-family: 'Courier New', monospace; }
+
+  footer { text-align: center; margin-top: 32px; font-size: 10px; color: rgba(200,222,255,0.18); letter-spacing: 2px; }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spin { display: inline-block; width: 10px; height: 10px; border: 2px solid rgba(255,204,68,0.3); border-top-color: #ffcc44; border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 6px; vertical-align: middle; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">STRUCTURAL DRAWING</div>
+  <h1>配筋圖面核對系統</h1>
+  <div class="sub">REBAR COMPARISON TOOL — AI POWERED</div>
+</header>
+
+<div class="field">
+  <div class="field-label">Gemini / Gemma API Key</div>
+  <div class="key-row">
+    <input type="password" id="apiKey" placeholder="AIza..." oninput="checkReady()">
+    <button class="vis-btn" onclick="toggleVis()">顯示</button>
+  </div>
+  <div class="field-hint">取得金鑰：aistudio.google.com/app/apikey　金鑰僅在本地使用</div>
+</div>
+
+<div class="field">
+  <div class="field-label">模型</div>
+  <select id="model">
+    <optgroup label="── Gemma 4（Free Tier 可用）">
+      <option value="gemma-4-26b-a4b-it" selected>gemma-4-26b-a4b-it ✓ 已確認可用</option>
+      <option value="gemma-4-31b-it">gemma-4-31b-it（31B Dense）</option>
+    </optgroup>
+    <optgroup label="── Gemini">
+      <option value="gemini-1.5-flash">gemini-1.5-flash</option>
+      <option value="gemini-1.5-flash-8b">gemini-1.5-flash-8b（額度最多）</option>
+      <option value="gemini-2.0-flash">gemini-2.0-flash</option>
+    </optgroup>
+  </select>
+</div>
+
+<div class="upload-row">
+  <div>
+    <div class="field-label">圖 A（CAD 列印）</div>
+    <div class="upload-box" id="boxA" onclick="document.getElementById('fA').click()"
+         ondragover="event.preventDefault()" ondrop="onDrop(event,'A')">
+      <div id="phA">
+        <div class="upload-icon">📐</div>
+        <div class="upload-text">點擊或拖曳上傳</div>
+        <div class="upload-hint-sm">JPG / PNG / WEBP</div>
+      </div>
+      <div id="pvA" style="display:none;flex-direction:column;align-items:center;">
+        <img id="imgA" class="preview-img">
+        <button class="clear-btn" onclick="clearFile(event,'A')">移除</button>
+      </div>
+    </div>
+    <input type="file" id="fA" accept="image/*" onchange="onFile(event,'A')">
+  </div>
+  <div>
+    <div class="field-label">圖 B（紙本拍照）</div>
+    <div class="upload-box" id="boxB" onclick="document.getElementById('fB').click()"
+         ondragover="event.preventDefault()" ondrop="onDrop(event,'B')">
+      <div id="phB">
+        <div class="upload-icon">📷</div>
+        <div class="upload-text">點擊或拖曳上傳</div>
+        <div class="upload-hint-sm">JPG / PNG / WEBP</div>
+      </div>
+      <div id="pvB" style="display:none;flex-direction:column;align-items:center;">
+        <img id="imgB" class="preview-img">
+        <button class="clear-btn" onclick="clearFile(event,'B')">移除</button>
+      </div>
+    </div>
+    <input type="file" id="fB" accept="image/*" onchange="onFile(event,'B')">
+  </div>
+</div>
+
+<button class="go-btn" id="goBtn" onclick="run()" disabled>▶ 開始比對</button>
+
+<div id="logWrap">
+  <div class="log-title">▌ 執行紀錄</div>
+  <div id="logBox"></div>
+</div>
+
+<div id="resultWrap">
+  <div class="result-title">— 比對結果 ——————————————</div>
+  <div class="badges" id="badges"></div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr>
+        <th>梁編號</th><th>狀態</th><th>圖 A</th><th>圖 B</th><th>備註</th>
+      </tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+  <div id="alertBox"></div>
+  <div class="raw-wrap">
+    <button class="raw-toggle" onclick="toggleRaw(this)">▼ 查看 AI 原始輸出</button>
+    <pre id="rawBox"></pre>
+  </div>
+</div>
+
+<footer>AI 比對僅供參考，最終以人工核對為準</footer>
+
+<script>
+const S = { b64A:null, mimeA:'image/jpeg', b64B:null, mimeB:'image/jpeg' };
+
+function g(id){ return document.getElementById(id); }
+
+function log(msg, cls){
+  cls = cls || 'log-ok';
+  g('logWrap').style.display = 'block';
+  var t = new Date().toLocaleTimeString('zh-TW', {hour12:false});
+  g('logBox').innerHTML += '<div class="' + cls + '">[' + t + '] ' + msg + '</div>';
+  g('logBox').scrollTop = 9999;
+}
+
+function fileToB64(file){
+  return new Promise(function(ok, err){
+    var r = new FileReader();
+    r.onload = function(){ ok(r.result.split(',')[1]); };
+    r.onerror = err;
+    r.readAsDataURL(file);
+  });
+}
+
+function checkReady(){
+  var key = g('apiKey').value.trim();
+  g('goBtn').disabled = !(S.b64A && S.b64B && key);
+}
+
+function toggleVis(){
+  var inp = g('apiKey');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+  event.target.textContent = inp.type === 'password' ? '顯示' : '隱藏';
+}
+
+function loadFile(file, side){
+  fileToB64(file).then(function(b64){
+    var url = URL.createObjectURL(file);
+    var mime = file.type || 'image/jpeg';
+    if(side === 'A'){ S.b64A = b64; S.mimeA = mime; g('imgA').src = url; }
+    else            { S.b64B = b64; S.mimeB = mime; g('imgB').src = url; }
+    g('ph' + side).style.display = 'none';
+    g('pv' + side).style.display = 'flex';
+    g('box' + side).classList.add('has-img');
+    checkReady();
+  });
+}
+function onFile(e, side){ if(e.target.files[0]) loadFile(e.target.files[0], side); }
+function onDrop(e, side){ e.preventDefault(); if(e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0], side); }
+function clearFile(e, side){
+  e.stopPropagation();
+  if(side==='A'){ S.b64A=null; g('fA').value=''; }
+  else          { S.b64B=null; g('fB').value=''; }
+  g('ph'+side).style.display = 'block';
+  g('pv'+side).style.display = 'none';
+  g('box'+side).classList.remove('has-img');
+  checkReady();
+}
+
+function run(){
+  var btn = g('goBtn');
+  btn.disabled = true;
+  btn.classList.add('running');
+  btn.innerHTML = '<span class="spin"></span>AI 比對中...';
+
+  g('logBox').innerHTML = '';
+  g('logWrap').style.display = 'block';
+  g('resultWrap').style.display = 'none';
+  g('rawBox').textContent = '';
+  g('rawBox').style.display = 'none';
+
+  var model = g('model').value;
+  var apiKey = g('apiKey').value.trim();
+
+  log('🚀 模型：' + model);
+  log('📤 傳送圖片至 API...');
+
+  var prompt = '你是一位專業的結構工程師，正在核對兩張建築結構配筋圖面（圖A與圖B）是否一致。\n\n請仔細閱讀兩張圖面上每一根梁的配筋資訊，包括：\n- 梁編號（如 RG11a、7G11b 等）\n- 梁尺寸（如 80X100）\n- 主筋號數與根數（如 #5-27#15）\n- 箍筋規格與間距（如 5-#10）\n- 其他標註（如 1L-#5(EF.)）\n\n輸出一個 JSON 陣列，每筆代表一根梁：\n[{"beam":"梁編號","status":"same","versionA":"圖A描述","versionB":"圖B描述","note":"備註"}]\n\nstatus 值：same=一致, diff=有差異, unclear=無法確認。只輸出 JSON，不要 markdown 或其他文字。';
+
+  var url = 'https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + apiKey;
+  var body = JSON.stringify({
+    contents: [{
+      parts: [
+        { text: '圖A：' },
+        { inline_data: { mime_type: S.mimeA, data: S.b64A } },
+        { text: '圖B：' },
+        { inline_data: { mime_type: S.mimeB, data: S.b64B } },
+        { text: prompt }
+      ]
+    }],
+    generationConfig: { maxOutputTokens: 4000, temperature: 0.1 }
+  });
+
+  fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body })
+    .then(function(res){
+      log('📡 HTTP ' + res.status + ' ' + res.statusText);
+      return res.json().then(function(data){ return { ok: res.ok, status: res.status, data: data }; });
+    })
+    .then(function(r){
+      var data = r.data;
+
+      if(!r.ok){
+        var msg = (data && data.error && data.error.message) ? data.error.message : '未知錯誤';
+        log('❌ API 錯誤：' + msg, 'log-error');
+        return;
+      }
+
+      if(data.error){
+        log('❌ ' + data.error.message, 'log-error');
+        return;
+      }
+
+      var parts = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) ? data.candidates[0].content.parts : [];
+      var text = parts.map(function(p){ return p.text || ''; }).join('\n').trim();
+
+      if(!text){
+        var reason = (data.candidates && data.candidates[0] && data.candidates[0].finishReason) ? data.candidates[0].finishReason : '未知';
+        log('⚠ 回應為空，finishReason: ' + reason, 'log-warn');
+        log('原始回應：' + JSON.stringify(data).substring(0, 300), 'log-warn');
+        return;
+      }
+
+      log('✅ 收到回應（' + text.length + ' 字元），解析中...');
+      g('rawBox').textContent = text;
+
+      var rows = null;
+      try {
+        rows = JSON.parse(text.replace(/```json|```/g, '').trim());
+      } catch(e1) {
+        var m = text.match(/\[[\s\S]*\]/);
+        if(m){ try { rows = JSON.parse(m[0]); } catch(e2){} }
+      }
+
+      if(rows && Array.isArray(rows) && rows.length > 0){
+        log('📋 解析到 ' + rows.length + ' 筆梁資料', 'log-success');
+        renderTable(rows);
+      } else {
+        log('⚠ 無法解析為表格，顯示原始輸出', 'log-warn');
+        g('rawBox').style.display = 'block';
+      }
+    })
+    .catch(function(e){
+      log('❌ 網路錯誤：' + e.message, 'log-error');
+    })
+    .finally(function(){
+      btn.classList.remove('running');
+      btn.innerHTML = '▶ 開始比對';
+      btn.disabled = false;
+      log('🏁 完成');
+    });
+}
+
+function renderTable(rows){
+  var same = rows.filter(function(r){ return r.status==='same'; }).length;
+  var diff = rows.filter(function(r){ return r.status==='diff'; }).length;
+  var unk  = rows.filter(function(r){ return r.status==='unclear'; }).length;
+
+  g('badges').innerHTML =
+    '<span class="badge b-ok">✓ 一致 ' + same + '</span>' +
+    '<span class="badge b-diff">✗ 差異 ' + diff + '</span>' +
+    '<span class="badge b-unk">? 不確定 ' + unk + '</span>';
+
+  function icon(s){ return s==='same' ? '<span style="color:#48c774">✓</span>' : s==='diff' ? '<span style="color:#ff5252">✗</span>' : '<span style="color:#ffc107">?</span>'; }
+  function cls(s) { return s==='same' ? 'c-ok' : s==='diff' ? 'c-diff' : 'c-unk'; }
+
+  g('tbody').innerHTML = rows.map(function(r){
+    return '<tr><td class="c-beam">'+(r.beam||'—')+'</td><td style="text-align:center">'+icon(r.status)+'</td><td class="'+cls(r.status)+'">'+(r.versionA||'—')+'</td><td class="'+cls(r.status)+'">'+(r.versionB||'—')+'</td><td class="c-note">'+(r.note||'')+'</td></tr>';
+  }).join('');
+
+  g('alertBox').innerHTML = diff > 0
+    ? '<div class="alert alert-diff">⚠ 發現 ' + diff + ' 處差異，請人工核對紅色項目。</div>'
+    : '<div class="alert alert-ok">✓ 所有可辨識梁的配筋兩版本一致。</div>';
+
+  g('resultWrap').style.display = 'block';
+}
+
+function toggleRaw(btn){
+  var box = g('rawBox');
+  box.style.display = box.style.display === 'none' ? 'block' : 'none';
+  btn.textContent = box.style.display === 'none' ? '▼ 查看 AI 原始輸出' : '▲ 隱藏 AI 原始輸出';
+}
+</script>
+</body>
+</html>
