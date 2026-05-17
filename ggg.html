@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>Gemma4 結構圖 OCR 強化版</title>
+<title>Gemma4 結構圖 OCR 專業版</title>
 
 <style>
 
@@ -22,7 +22,7 @@ body{
 }
 
 .container{
-  max-width:1300px;
+  max-width:1400px;
   margin:auto;
 }
 
@@ -106,7 +106,7 @@ input,select{
   background:#000;
   border:1px solid #1e4d8c;
   padding:12px;
-  max-height:250px;
+  max-height:260px;
   overflow-y:auto;
   font-size:12px;
   line-height:1.7;
@@ -132,8 +132,9 @@ input,select{
   white-space:pre-wrap;
   line-height:1.7;
   display:none;
-  max-height:700px;
+  max-height:800px;
   overflow:auto;
+  font-size:14px;
 }
 
 #chunkPreview{
@@ -145,19 +146,18 @@ input,select{
 
 .chunk-box{
   border:1px solid #1e4d8c;
-  padding:8px;
+  padding:6px;
   background:#111;
 }
 
 .chunk-box img{
   width:100%;
-  border:1px solid #333;
 }
 
 .chunk-title{
-  margin-bottom:6px;
   color:#4a9eff;
   font-size:11px;
+  margin-bottom:5px;
 }
 
 </style>
@@ -167,7 +167,7 @@ input,select{
 
 <div class="container">
 
-<h1>Gemma4 結構圖 OCR 強化版</h1>
+<h1>Gemma4 結構圖 OCR 專業版</h1>
 
 <div class="field">
 
@@ -311,7 +311,6 @@ function handleFile(input){
   reader.readAsDataURL(file);
 }
 
-// 改為灰階，不做二值化
 function preprocessCanvas(ctx, width, height){
 
   const imageData =
@@ -340,11 +339,10 @@ function splitImageIntoChunks(img){
 
   const chunks = [];
 
-  // 改為 4x4
-  const rows = 4;
+  // 3x4 = 12塊
+  const rows = 3;
   const cols = 4;
 
-  // overlap
   const overlap = 120;
 
   const chunkWidth =
@@ -402,16 +400,12 @@ function splitImageIntoChunks(img){
 
       ctx.drawImage(
         img,
-
         sx,
         sy,
-
         sw,
         sh,
-
         0,
         0,
-
         sw,
         sh
       );
@@ -428,9 +422,10 @@ function splitImageIntoChunks(img){
           0.95
         );
 
-      chunks.push(
-        base64.split(',')[1]
-      );
+      chunks.push({
+        index,
+        base64:base64.split(',')[1]
+      });
 
       const div =
         document.createElement('div');
@@ -454,7 +449,57 @@ function splitImageIntoChunks(img){
   return chunks;
 }
 
-async function ocrChunk(base64, index){
+function cleanOCRText(text){
+
+  if(!text) return '';
+
+  const lines =
+    text.split('\n');
+
+  const cleaned =
+    lines.filter(line=>{
+
+      const t = line.trim();
+
+      if(!t) return false;
+
+      const blacklist = [
+
+        'task',
+        'self-correction',
+        'refining',
+        'analysis',
+        'markdown',
+        'beam text only',
+        'output only',
+        'extract all',
+        'detected text',
+        'plain text only',
+        'do not',
+        'describe image',
+        'beam reinforcement text'
+      ];
+
+      const lower =
+        t.toLowerCase();
+
+      for(const b of blacklist){
+
+        if(lower.includes(b)){
+
+          return false;
+        }
+      }
+
+      return true;
+    });
+
+  // 去重複
+  return [...new Set(cleaned)]
+    .join('\n');
+}
+
+async function ocrChunk(base64, index, retry=0){
 
   const apiKey =
     document.getElementById('apiKey')
@@ -473,8 +518,10 @@ async function ocrChunk(base64, index){
     'log-blue'
   );
 
-  const response =
-    await fetch(url,{
+  try{
+
+    const response =
+      await fetch(url,{
 
       method:'POST',
 
@@ -491,9 +538,17 @@ async function ocrChunk(base64, index){
             {
               text:
 `
-Extract all beam reinforcement text.
+OCR ONLY.
 
-Output plain text only.
+Output ONLY detected text.
+
+DO NOT explain.
+DO NOT analyze.
+DO NOT summarize.
+DO NOT describe image.
+DO NOT use markdown.
+
+Beam text only.
 `
             },
 
@@ -509,7 +564,7 @@ Output plain text only.
 
         generationConfig:{
 
-          temperature:0.1,
+          temperature:0.05,
 
           maxOutputTokens:384
         }
@@ -517,44 +572,94 @@ Output plain text only.
       })
     });
 
-  const result =
-    await response.json();
+    const result =
+      await response.json();
 
-  console.log(
-    `區塊 ${index}`,
-    result
-  );
+    if(!response.ok){
 
-  if(!response.ok){
+      throw new Error(
+        result.error?.message ||
+        'API錯誤'
+      );
+    }
 
-    throw new Error(
-      `區塊 ${index} API錯誤`
+    const text =
+      result.candidates?.[0]
+      ?.content?.parts?.[0]
+      ?.text || '';
+
+    if(!text){
+
+      throw new Error(
+        '無文字結果'
+      );
+    }
+
+    addLog(
+      `區塊 ${index} 完成`,
+      'log-green'
     );
+
+    return cleanOCRText(text);
+  }
+  catch(err){
+
+    // retry 2次
+    if(retry < 2){
+
+      addLog(
+        `區塊 ${index} 重試 ${retry+1}`,
+        'log-red'
+      );
+
+      await new Promise(r=>
+        setTimeout(r,2000)
+      );
+
+      return await ocrChunk(
+        base64,
+        index,
+        retry+1
+      );
+    }
+
+    addLog(
+      `區塊 ${index} 失敗`,
+      'log-red'
+    );
+
+    return '';
+  }
+}
+
+async function processChunksParallel(chunks){
+
+  const results = [];
+
+  // 同時3個
+  const batchSize = 3;
+
+  for(let i=0;i<chunks.length;i+=batchSize){
+
+    const batch =
+      chunks.slice(i,i+batchSize);
+
+    const batchResults =
+      await Promise.all(
+
+      batch.map(chunk=>
+
+        ocrChunk(
+          chunk.base64,
+          chunk.index
+        )
+      )
+    );
+
+    results.push(...batchResults);
   }
 
-  const text =
-    result.candidates?.[0]
-    ?.content?.parts?.[0]
-    ?.text || '';
-
-  if(!text){
-
-    throw new Error(
-      `區塊 ${index} 無文字`
-    );
-  }
-
-  addLog(
-    `區塊 ${index} 完成`,
-    'log-green'
-  );
-
-  return `
-========== 區塊 ${index} ==========
-
-${text}
-
-`;
+  return results;
 }
 
 async function runOCR(){
@@ -568,7 +673,7 @@ async function runOCR(){
   btn.disabled = true;
 
   btn.innerText =
-    '⏳ OCR 中...';
+    '⏳ OCR中...';
 
   resultDiv.style.display='none';
 
@@ -587,36 +692,23 @@ async function runOCR(){
       'log-green'
     );
 
-    let finalText = '';
+    const results =
+      await processChunksParallel(chunks);
 
-    for(let i=0;i<chunks.length;i++){
+    // 合併
+    const merged =
+      results.join('\n');
 
-      try{
+    // 最終去重
+    const finalText =
+      [...new Set(
 
-        const text =
-          await ocrChunk(
-            chunks[i],
-            i+1
-          );
+        merged
+        .split('\n')
+        .map(v=>v.trim())
+        .filter(v=>v)
 
-        finalText += text;
-      }
-      catch(err){
-
-        console.error(err);
-
-        addLog(
-          err.message,
-          'log-red'
-        );
-
-        finalText += `
-========== 區塊 ${i+1} ==========
-OCR失敗
-
-`;
-      }
-    }
+      )].join('\n');
 
     resultDiv.innerText =
       finalText;
