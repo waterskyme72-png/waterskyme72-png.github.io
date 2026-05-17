@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>Gemma4 單圖 OCR 測試</title>
+<title>Gemma4 結構圖分塊 OCR 系統</title>
 
 <style>
 
@@ -22,7 +22,7 @@ body{
 }
 
 .container{
-  max-width:900px;
+  max-width:1200px;
   margin:auto;
 }
 
@@ -57,7 +57,7 @@ input,select{
 
   border:2px dashed #1e4d8c;
 
-  height:220px;
+  height:260px;
 
   display:flex;
   flex-direction:column;
@@ -83,7 +83,7 @@ input,select{
 .preview{
 
   max-width:95%;
-  max-height:180px;
+  max-height:220px;
 
   display:none;
 
@@ -136,13 +136,13 @@ input,select{
 
   padding:12px;
 
-  max-height:200px;
+  max-height:250px;
 
   overflow-y:auto;
 
   font-size:12px;
 
-  line-height:1.6;
+  line-height:1.7;
 }
 
 .log-blue{
@@ -172,6 +172,45 @@ input,select{
   line-height:1.7;
 
   display:none;
+
+  max-height:700px;
+
+  overflow:auto;
+}
+
+#chunkPreview{
+
+  display:grid;
+
+  grid-template-columns:repeat(2,1fr);
+
+  gap:10px;
+
+  margin-top:20px;
+}
+
+.chunk-box{
+
+  border:1px solid #1e4d8c;
+
+  padding:10px;
+
+  background:#111;
+}
+
+.chunk-box img{
+
+  width:100%;
+  border:1px solid #333;
+}
+
+.chunk-title{
+
+  margin-bottom:8px;
+
+  color:#4a9eff;
+
+  font-size:12px;
 }
 
 </style>
@@ -181,7 +220,7 @@ input,select{
 
 <div class="container">
 
-<h1>Gemma4 單圖 OCR 測試</h1>
+<h1>Gemma4 結構圖分塊 OCR 系統</h1>
 
 <div class="field">
 
@@ -202,13 +241,13 @@ input,select{
 
 <select id="modelName">
 
-  <option value="gemma-4-26b-a4b-it">
-    gemma-4-26b-a4b-it
-  </option>
+<option value="gemma-4-26b-a4b-it">
+gemma-4-26b-a4b-it
+</option>
 
-  <option value="gemma-4-31b-it">
-    gemma-4-31b-it
-  </option>
+<option value="gemma-4-31b-it">
+gemma-4-31b-it
+</option>
 
 </select>
 
@@ -220,7 +259,7 @@ input,select{
 >
 
 <div id="uploadText">
-📷 上傳梁配筋圖
+📷 上傳結構圖
 </div>
 
 <img id="preview" class="preview">
@@ -243,12 +282,14 @@ input,select{
   onclick="runOCR()"
   disabled
 >
-▶ 開始 OCR
+▶ 開始分塊 OCR
 </button>
 
 <div id="statusLog">
 系統就緒
 </div>
+
+<div id="chunkPreview"></div>
 
 <div id="result"></div>
 
@@ -256,7 +297,7 @@ input,select{
 
 <script>
 
-let imageBase64 = null;
+let originalImage = null;
 
 function addLog(msg, cls=''){
 
@@ -281,7 +322,7 @@ function checkReady(){
     .trim();
 
   document.getElementById('runBtn').disabled =
-    !(key && imageBase64);
+    !(key && originalImage);
 }
 
 function handleFile(input){
@@ -298,41 +339,10 @@ function handleFile(input){
 
     img.onload = ()=>{
 
-      const canvas =
-        document.createElement('canvas');
-
-      let w = img.width;
-      let h = img.height;
-
-      // 降低解析度避免 Gemma 崩潰
-      const MAX = 768;
-
-      if(w > MAX || h > MAX){
-
-        const ratio =
-          Math.min(MAX/w, MAX/h);
-
-        w *= ratio;
-        h *= ratio;
-      }
-
-      canvas.width = w;
-      canvas.height = h;
-
-      const ctx =
-        canvas.getContext('2d');
-
-      ctx.drawImage(img,0,0,w,h);
-
-      // 強壓縮
-      const base64 =
-        canvas.toDataURL('image/jpeg',0.6);
-
-      imageBase64 =
-        base64.split(',')[1];
+      originalImage = img;
 
       document.getElementById('preview').src =
-        base64;
+        e.target.result;
 
       document.getElementById('preview').style.display =
         'block';
@@ -341,7 +351,7 @@ function handleFile(input){
         'none';
 
       addLog(
-        '圖片處理完成',
+        `圖片載入完成 (${img.width} x ${img.height})`,
         'log-green'
       );
 
@@ -354,10 +364,123 @@ function handleFile(input){
   reader.readAsDataURL(file);
 }
 
-async function runOCR(){
+function preprocessCanvas(ctx, width, height){
 
-  const btn =
-    document.getElementById('runBtn');
+  const imageData =
+    ctx.getImageData(0,0,width,height);
+
+  const data = imageData.data;
+
+  for(let i=0;i<data.length;i+=4){
+
+    const avg =
+      (
+        data[i] +
+        data[i+1] +
+        data[i+2]
+      ) / 3;
+
+    const value =
+      avg > 180 ? 255 : 0;
+
+    data[i] = value;
+    data[i+1] = value;
+    data[i+2] = value;
+  }
+
+  ctx.putImageData(imageData,0,0);
+}
+
+function splitImageIntoChunks(img){
+
+  const chunks = [];
+
+  const rows = 2;
+  const cols = 2;
+
+  const chunkWidth =
+    Math.floor(img.width / cols);
+
+  const chunkHeight =
+    Math.floor(img.height / rows);
+
+  const previewArea =
+    document.getElementById('chunkPreview');
+
+  previewArea.innerHTML = '';
+
+  let index = 1;
+
+  for(let y=0;y<rows;y++){
+
+    for(let x=0;x<cols;x++){
+
+      const canvas =
+        document.createElement('canvas');
+
+      canvas.width = chunkWidth;
+      canvas.height = chunkHeight;
+
+      const ctx =
+        canvas.getContext('2d');
+
+      ctx.drawImage(
+        img,
+
+        x * chunkWidth,
+        y * chunkHeight,
+
+        chunkWidth,
+        chunkHeight,
+
+        0,
+        0,
+
+        chunkWidth,
+        chunkHeight
+      );
+
+      // 黑白化提升 OCR
+      preprocessCanvas(
+        ctx,
+        chunkWidth,
+        chunkHeight
+      );
+
+      const base64 =
+        canvas.toDataURL(
+          'image/jpeg',
+          0.95
+        );
+
+      chunks.push(
+        base64.split(',')[1]
+      );
+
+      // 顯示切塊預覽
+      const div =
+        document.createElement('div');
+
+      div.className = 'chunk-box';
+
+      div.innerHTML = `
+        <div class="chunk-title">
+          區塊 ${index}
+        </div>
+
+        <img src="${base64}">
+      `;
+
+      previewArea.appendChild(div);
+
+      index++;
+    }
+  }
+
+  return chunks;
+}
+
+async function ocrChunk(base64, index){
 
   const apiKey =
     document.getElementById('apiKey')
@@ -368,37 +491,16 @@ async function runOCR(){
     document.getElementById('modelName')
     .value;
 
-  const resultDiv =
-    document.getElementById('result');
-
-  btn.disabled = true;
-
-  btn.innerText =
-    '⏳ Gemma OCR 中...';
-
-  resultDiv.style.display='none';
-
-  addLog(
-    `正在連線 ${model}`,
-    'log-blue'
-  );
-
   const url =
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
-  const controller =
-    new AbortController();
+  addLog(
+    `區塊 ${index} OCR 中...`,
+    'log-blue'
+  );
 
-  const timeoutId =
-    setTimeout(
-      ()=>controller.abort(),
-      180000
-    );
-
-  try{
-
-    const response =
-      await fetch(url,{
+  const response =
+    await fetch(url,{
 
       method:'POST',
 
@@ -415,11 +517,9 @@ async function runOCR(){
             {
               text:
 `
-請辨識這張圖片中的所有文字。
+請辨識這張工程結構圖中的文字。
 
-這是工程梁配筋圖。
-
-請完整輸出：
+重點辨識：
 
 1. 梁號
 2. 主筋
@@ -427,14 +527,14 @@ async function runOCR(){
 
 不要分析。
 不要JSON。
-只輸出辨識到的文字。
+只輸出文字。
 `
             },
 
             {
               inline_data:{
                 mime_type:'image/jpeg',
-                data:imageBase64
+                data:base64
               }
             }
 
@@ -445,67 +545,108 @@ async function runOCR(){
 
           temperature:0.1,
 
-          maxOutputTokens:512
+          maxOutputTokens:256
         }
 
-      }),
-
-      signal:controller.signal
+      })
     });
 
-    clearTimeout(timeoutId);
+  const result =
+    await response.json();
 
-    const result =
-      await response.json();
+  console.log(
+    `區塊 ${index}`,
+    result
+  );
 
-    console.log(result);
+  if(!response.ok){
 
-    if(!response.ok){
+    throw new Error(
+      `區塊 ${index} API錯誤`
+    );
+  }
 
-      throw new Error(
-        result.error?.message ||
-        'API 錯誤'
-      );
+  const text =
+    result.candidates?.[0]
+    ?.content?.parts?.[0]
+    ?.text || '';
+
+  addLog(
+    `區塊 ${index} 完成`,
+    'log-green'
+  );
+
+  return `
+========== 區塊 ${index} ==========
+
+${text}
+
+`;
+}
+
+async function runOCR(){
+
+  const btn =
+    document.getElementById('runBtn');
+
+  const resultDiv =
+    document.getElementById('result');
+
+  btn.disabled = true;
+
+  btn.innerText =
+    '⏳ 分塊 OCR 中...';
+
+  resultDiv.style.display='none';
+
+  try{
+
+    addLog(
+      '開始切割圖片',
+      'log-blue'
+    );
+
+    const chunks =
+      splitImageIntoChunks(originalImage);
+
+    addLog(
+      `已切成 ${chunks.length} 個區塊`,
+      'log-green'
+    );
+
+    let finalText = '';
+
+    for(let i=0;i<chunks.length;i++){
+
+      try{
+
+        const text =
+          await ocrChunk(
+            chunks[i],
+            i+1
+          );
+
+        finalText += text;
+      }
+      catch(err){
+
+        console.error(err);
+
+        finalText += `
+========== 區塊 ${i+1} ==========
+OCR失敗
+
+`;
+      }
     }
 
-    if(!result.candidates){
-
-      console.error(result);
-
-      throw new Error(
-        '沒有 candidates'
-      );
-    }
-
-    if(!result.candidates.length){
-
-      console.error(result);
-
-      throw new Error(
-        'candidates 為空'
-      );
-    }
-
-    const text =
-      result.candidates?.[0]
-      ?.content?.parts?.[0]
-      ?.text;
-
-    if(!text){
-
-      console.error(result);
-
-      throw new Error(
-        'Gemma 沒有回傳文字'
-      );
-    }
-
-    resultDiv.innerText = text;
+    resultDiv.innerText =
+      finalText;
 
     resultDiv.style.display='block';
 
     addLog(
-      'OCR 完成',
+      '全部 OCR 完成',
       'log-green'
     );
   }
@@ -513,27 +654,17 @@ async function runOCR(){
 
     console.error(err);
 
-    if(err.name === 'AbortError'){
-
-      addLog(
-        '模型逾時',
-        'log-red'
-      );
-    }
-    else{
-
-      addLog(
-        err.message,
-        'log-red'
-      );
-    }
+    addLog(
+      err.message,
+      'log-red'
+    );
   }
   finally{
 
     btn.disabled = false;
 
     btn.innerText =
-      '▶ 開始 OCR';
+      '▶ 開始分塊 OCR';
   }
 }
 
