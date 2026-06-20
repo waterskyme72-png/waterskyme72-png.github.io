@@ -3,620 +3,384 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>台股 200 強價值監控 - FinMind 計算版</title>
+    <title>Gemma 4 電表抄表小助手</title>
     <style>
         :root {
-            --bg: #0d1117;
-            --card: #161b22;
-            --border: #30363d;
-            --text: #c9d1d9;
-            --dim: #8b949e;
-            --up: #f85149;
-            --down: #3fb950;
-            --accent: #58a6ff;
-        }
-
-        * {
-            box-sizing: border-box;
+            --primary: #2563eb;
+            --success: #16a34a;
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --text: #1e293b;
         }
         body {
-            margin: 0;
-            background: var(--bg);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg);
             color: var(--text);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        }
-
-        header {
-            padding: 16px 24px;
-            background: #010409;
-            border-bottom: 1px solid var(--border);
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 16px;
-        }
-        .logo h1 {
             margin: 0;
-            color: var(--accent);
-            font-size: 1.2rem;
+            padding: 16px;
         }
-
-        .category-bar {
-            padding: 12px 24px;
-            background: #0d1117;
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            gap: 8px;
-            overflow-x: auto;
-            align-items: center;
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
         }
-        .c-btn {
-            background: #21262d;
-            border: 1px solid var(--border);
-            color: var(--text);
-            padding: 8px 14px;
-            border-radius: 6px;
-            cursor: pointer;
-            white-space: nowrap;
-            font-size: 0.85rem;
-        }
-        .c-btn.active {
-            background: var(--accent);
-            color: white;
-            border-color: var(--accent);
-            font-weight: bold;
-        }
-
-        .sync-area {
-            padding: 10px 24px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            background: #161b22;
-            border-bottom: 1px solid var(--border);
-        }
-        .btn-sync {
-            background: #238636;
-            color: white;
-            border: none;
-            padding: 8px 18px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: bold;
-            display: none;
-        }
-        .btn-sync:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        .sort-bar {
-            padding: 8px 24px;
-            display: flex;
-            gap: 8px;
-            overflow-x: auto;
-            border-bottom: 1px solid var(--border);
-        }
-        .sbtn {
-            background: transparent;
-            border: 1px solid var(--border);
-            color: var(--dim);
-            padding: 4px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 0.75rem;
-        }
-        .sbtn.active {
-            border-color: var(--accent);
-            color: var(--accent);
-        }
-
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-            gap: 16px;
-            padding: 20px;
+        h2 {
+            text-align: center;
+            color: var(--primary);
+            margin-bottom: 20px;
         }
         .card {
             background: var(--card);
-            border: 1px solid var(--border);
             border-radius: 12px;
-            padding: 18px;
-            transition: 0.2s;
-            position: relative;
+            padding: 16px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            margin-bottom: 16px;
         }
-        .card:hover {
-            border-color: #8b949e;
-        }
-
-        .card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 12px;
-        }
-        .code {
-            font-size: 0.8rem;
-            color: var(--dim);
-            font-family: monospace;
-        }
-        .name {
-            font-size: 1.15rem;
-            font-weight: 800;
-            color: white;
-            margin-top: 2px;
-        }
-
-        .price-row {
-            display: flex;
-            align-items: baseline;
-            gap: 10px;
-            margin-bottom: 8px;
-        }
-        .price {
-            font-size: 2rem;
-            font-weight: 800;
-        }
-        .change {
-            font-size: 1rem;
-            font-weight: 600;
-        }
-        .up {
-            color: var(--up);
-        }
-        .down {
-            color: var(--down);
-        }
-
-        .source-tag {
-            font-size: 0.6rem;
-            color: var(--dim);
-            margin-bottom: 12px;
-        }
-        .source-tag span {
-            background: #21262d;
-            padding: 2px 8px;
-            border-radius: 4px;
-            border: 1px solid var(--border);
-        }
-
-        .peg-label {
-            padding: 4px 10px;
-            border-radius: 6px;
-            font-size: 0.7rem;
-            font-weight: bold;
-            text-align: center;
-        }
-        .value-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 8px;
-        }
-        .v-box {
-            background: #0d1117;
-            padding: 8px;
-            border-radius: 6px;
-        }
-        .v-lbl {
+        label {
             display: block;
-            font-size: 0.6rem;
-            color: var(--dim);
-            margin-bottom: 2px;
+            font-weight: bold;
+            margin-bottom: 6px;
+            font-size: 14px;
         }
-        .v-val {
-            font-size: 0.9rem;
-            font-weight: 700;
+        input[type="text"], select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            box-sizing: border-box;
+            margin-bottom: 12px;
+            font-size: 14px;
         }
-
-        #loading {
-            position: fixed;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.85);
-            display: none;
-            justify-content: center;
-            align-items: center;
-            z-index: 999;
-            flex-direction: column;
-        }
-        .progress-info {
-            color: white;
-            margin-top: 15px;
-            font-size: 1rem;
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
             text-align: center;
+            transition: background 0.2s;
         }
-
-        @media (max-width: 600px) {
-            .search-box {
-                width: 140px !important;
-            }
-            .sync-area {
-                flex-direction: column;
-                gap: 10px;
-                text-align: center;
-            }
+        .btn-primary { background-color: var(--primary); color: white; }
+        .btn-primary:hover { background-color: #1d4ed8; }
+        .btn-success { background-color: var(--success); color: white; margin-top: 10px; }
+        .btn-success:hover { background-color: #15803d; }
+        
+        #camera-label {
+            border: 2px dashed var(--primary);
+            color: var(--primary);
+            padding: 24px;
+            text-align: center;
+            border-radius: 8px;
+            cursor: pointer;
+            display: block;
+            font-weight: bold;
+            background-color: #eff6ff;
+        }
+        #camera-input { display: none; }
+        
+        .preview-box {
+            text-align: center;
+            margin-top: 12px;
+        }
+        #preview-img {
+            max-width: 100%;
+            max-height: 200px;
+            border-radius: 6px;
+            display: none;
+        }
+        .info-text {
+            font-size: 12px;
+            color: #64748b;
+            margin-top: 4px;
+        }
+        
+        .table-container {
+            overflow-x: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 12px;
+            font-size: 14px;
+        }
+        th, td {
+            border: 1px solid #e2e8f0;
+            padding: 10px;
+            text-align: left;
+        }
+        th { background-color: #f1f5f9; }
+        
+        .status {
+            text-align: center;
+            font-weight: bold;
+            color: var(--primary);
+            margin: 10px 0;
         }
     </style>
 </head>
 <body>
 
-    <div id="loading">
-        <div style="font-size: 2rem; animation: pulse 1s infinite;">🛰️</div>
-        <div class="progress-info" id="progressText">準備同步中...</div>
+<div class="container">
+    <h2>📊 Gemma 4 電表抄表系統</h2>
+
+    <div class="card">
+        <label for="api-url">API 端點 URL (依環境自行修改)</label>
+        <input type="text" id="api-url" value="https://openrouter.ai/api/v1/chat/completions" placeholder="例如: http://localhost:11434/v1/chat/completions">
+        
+        <label for="api-model">Gemma 4 模型名稱</label>
+        <input type="text" id="api-model" value="google/gemma-4-31b-it:free" placeholder="例如: gemma4:latest">
+
+        <label for="api-key">Gemma 4 API Key</label>
+        <input type="text" id="api-key" placeholder="請輸入您的 API Key">
     </div>
 
-    <header>
-        <div class="logo">
-            <h1>台股價值監控 <small style="font-size: 0.7rem; color: var(--dim);">FinMind 計算版</small></h1>
+    <div class="card">
+        <label id="camera-label" for="camera-input">📸 點擊此處進行電表拍照</label>
+        <input type="file" id="camera-input" accept="image/*" capture="environment">
+        
+        <div class="preview-box">
+            <img id="preview-img" alt="電表預覽">
+            <div id="file-size-info" class="info-text"></div>
         </div>
-        <input type="text" id="searchInput" class="search-box" style="background:#0d1117; border:1px solid var(--border); border-radius:6px; padding:8px; color:white; width:200px;" placeholder="篩選當前結果..." oninput="render()">
-    </header>
-
-    <div class="category-bar" id="categoryBar">
-        <button class="c-btn" onclick="selectCat('semi')">半導體/IC</button>
-        <button class="c-btn" onclick="selectCat('ai')">AI/電腦週邊</button>
-        <button class="c-btn" onclick="selectCat('component')">電子零組件</button>
-        <button class="c-btn" onclick="selectCat('finance')">金融/保險</button>
-        <button class="c-btn" onclick="selectCat('old_heavy')">航運/鋼鐵/水泥</button>
-        <button class="c-btn" onclick="selectCat('plastic_chem')">塑化/紡織/生技</button>
-        <button class="c-btn" onclick="selectCat('power')">電機/重電/能源</button>
-        <button class="c-btn" onclick="selectCat('other')">通路/其他權值</button>
+        <div id="status-msg" class="status"></div>
     </div>
 
-    <div class="sync-area">
-        <div id="catDesc" style="font-size: 0.9rem; color: var(--accent);">👈 請選擇產業別並開始同步</div>
-        <div style="display:flex; gap:10px; align-items:center;">
-            <span id="updateTime" style="font-size: 0.8rem; color: var(--dim);"></span>
-            <button id="syncBtn" class="btn-sync" onclick="fetchAllData()">🚀 同步數據</button>
+    <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <label style="margin: 0;">📋 辨識紀錄列表 (<span id="record-count">0</span>)</label>
+            <button class="btn btn-success" id="export-btn" style="width: auto; padding: 6px 12px; margin: 0;" disabled>輸出全部 CSV</button>
+        </div>
+        
+        <div class="table-container">
+            <table id="result-table">
+                <thead>
+                    <tr>
+                        <th>日期時間</th>
+                        <th>電表名稱</th>
+                        <th>累計用電量 (kWh)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    </tbody>
+            </table>
         </div>
     </div>
+</div>
 
-    <div class="sort-bar">
-        <button class="sbtn active" onclick="setSort('price', this)">股價排序</button>
-        <button class="sbtn" onclick="setSort('peg', this)">PEG 低→高</button>
-        <button class="sbtn" onclick="setSort('change', this)">漲跌幅</button>
-    </div>
+<script>
+    const cameraInput = document.getElementById('camera-input');
+    const previewImg = document.getElementById('preview-img');
+    const fileSizeInfo = document.getElementById('file-size-info');
+    const statusMsg = document.getElementById('status-msg');
+    const resultTable = document.getElementById('result-table').querySelector('tbody');
+    const recordCountSpan = document.getElementById('record-count');
+    const exportBtn = document.getElementById('export-btn');
 
-    <div id="mainGrid" class="grid"></div>
+    // 儲存所有抄表數據的陣列
+    let meterRecords = [];
 
-    <script>
-        // ===== 擴充後的 200 強產業數據庫 =====
-        const CATEGORIES = {
-            semi: { label: "半導體/IC設計", stocks: { "2330": "台積電", "2454": "聯發科", "2303": "聯電", "3711": "日月光投控", "2449": "京元電子", "3034": "聯詠", "3443": "創意", "3661": "世芯-KY", "6415": "矽力-KY", "6488": "環球晶", "8046": "南電", "2379": "瑞昱", "3035": "智原", "3532": "台勝科", "4919": "新唐", "4961": "天鈺", "5269": "祥碩", "5274": "信驊", "6239": "力成", "8299": "群聯", "2337": "旺宏", "2344": "華邦電", "2408": "南亞科" } },
-            ai: { label: "AI/電腦週邊", stocks: { "2317": "鴻海", "2382": "廣達", "2308": "台達電", "3017": "奇鋐", "6669": "緯穎", "3231": "緯創", "2357": "華碩", "2376": "技嘉", "2301": "光寶科", "2353": "宏碁", "2395": "研華", "3008": "大立光", "3044": "健鼎", "3515": "華擎", "3533": "嘉澤", "4958": "臻鼎-KY", "6213": "聯茂", "8016": "矽創", "2324": "仁寶", "2356": "英業達", "4938": "和碩" } },
-            component: { label: "電子零組件/光電", stocks: { "2327": "國巨", "3037": "欣興", "2409": "面板-友達", "3481": "面板-群創", "2313": "華通", "2360": "致茂", "2367": "燿華", "2368": "金像電", "2421": "建準", "2474": "可成", "3019": "亞光", "3376": "新日興", "6153": "嘉聯益", "6269": "台郡", "6271": "同欣電", "6278": "台表科", "6409": "旭隼" } },
-            finance: { label: "金融/保險", stocks: { "2881": "富邦金", "2882": "國泰金", "2884": "玉山金", "2885": "元大金", "2886": "兆豐金", "2891": "中信金", "5880": "合庫金", "2880": "華南金", "2883": "開發金", "2887": "台新金", "2888": "新光金", "2889": "國票金", "2890": "永豐金", "2892": "第一金", "5871": "中租-KY", "5876": "上海商銀", "6005": "群益證", "2834": "臺企銀" } },
-            old_heavy: { label: "航運/鋼鐵/水泥", stocks: { "2603": "長榮", "2609": "陽明", "2615": "萬海", "2618": "長榮航", "2610": "華航", "2002": "中鋼", "2014": "中鴻", "2027": "大成鋼", "1101": "台泥", "1102": "亞泥", "1216": "統一", "1210": "大成", "9921": "巨大", "9945": "潤泰新", "2105": "正新" } },
-            plastic_chem: { label: "塑化/紡織/生技", stocks: { "1301": "台塑", "1303": "南亞", "1326": "台化", "6505": "台塑化", "1722": "台肥", "1795": "美時", "6446": "藥華藥", "4147": "龍燈-KY", "1402": "遠東新", "1476": "儒鴻", "1477": "聚陽", "9910": "豐泰", "1707": "葡萄王" } },
-            power: { label: "電機/重電/能源", stocks: { "1513": "中興電", "1519": "華城", "1503": "士電", "1514": "亞力", "1504": "東元", "1560": "中砂", "2049": "上銀", "2331": "精英", "6806": "森崴能源", "9904": "寶成", "9933": "中鼎" } },
-            other: { label: "通路/其他權值", stocks: { "2412": "中華電", "4904": "遠傳", "3045": "台灣大", "2912": "統一超", "8454": "富邦媒", "2633": "高鐵", "2347": "聯強", "3702": "大聯大", "3036": "文曄", "9930": "中聯資源", "2207": "和泰車" } }
+    cameraInput.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        statusMsg.innerText = "正在壓縮圖片中...";
+        
+        try {
+            // 1. 壓縮圖片至 100KB 左右
+            const compressedBase64 = await compressImage(file);
+            previewImg.src = compressedBase64;
+            previewImg.style.display = 'block';
+
+            // 計算壓縮後的大小
+            const approxSizeKb = Math.round((compressedBase64.length * 3) / 4 / 1024);
+            fileSizeInfo.innerText = `原始大小: ${Math.round(file.size / 1024)} KB -> 壓縮後: ~${approxSizeKb} KB`;
+
+            // 自動將壓縮後的照片下載/儲存至手機
+            saveImageToDevice(compressedBase64);
+
+            // 2. 呼叫 Gemma 4 API 進行辨識
+            statusMsg.innerText = "正在傳送至 Gemma 4 進行多模態辨識...";
+            await callGemma4VisionAPI(compressedBase64);
+
+        } catch (error) {
+            console.error(error);
+            statusMsg.innerText = `錯誤: ${error.message}`;
+        }
+    });
+
+    // 圖片壓縮邏輯
+    function compressImage(file) {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = function (event) {
+                const img = new Image();
+                img.src = event.target.result;
+                img.onload = function () {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+
+                    // 限制最大邊長為 1000 像素，可將體積控制在 100KB 上下
+                    const MAX_BOUND = 1000;
+                    if (width > height) {
+                        if (width > MAX_BOUND) {
+                            height *= MAX_BOUND / width;
+                            width = MAX_BOUND;
+                        }
+                    } else {
+                        if (height > MAX_BOUND) {
+                            width *= MAX_BOUND / height;
+                            height = MAX_BOUND;
+                        }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    // 以 JPEG 格式輸出，品質設為 0.65
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.65);
+                    resolve(dataUrl);
+                };
+            };
+        });
+    }
+
+    // 儲存照片到手機的函式 (觸發瀏覽器下載)
+    function saveImageToDevice(base64Data) {
+        const link = document.createElement('a');
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        link.href = base64Data;
+        link.download = `Meter_${timestamp}.jpg`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    // 呼叫 Gemma 4 多模態 API
+    async function callGemma4VisionAPI(base64Data) {
+        const apiUrl = document.getElementById('api-url').value;
+        const modelName = document.getElementById('api-model').value;
+        const apiKey = document.getElementById('api-key').value;
+
+        if (!apiKey && apiUrl.includes("openrouter")) {
+            throw new Error("請先輸入您的 API Key！");
+        }
+
+        const promptText = "這是電表照片。右側通常有白底紅字的貼紙（包含電表名稱）。請精確提取兩項資訊：\n1. 累積用電量 (kwh)\n2. 標籤中的電表名稱（例如 N6 5F LLO）。\n請務必『嚴格』以 JSON 格式輸出，不需任何額外的解釋文字。格式如下：\n{\n  \"meter_name\": \"提取的名稱\",\n  \"kwh\": \"提取的數字，包含小數點\"\n}";
+
+        const headers = {
+            "Content-Type": "application/json"
+        };
+        if (apiKey) {
+            headers["Authorization"] = `Bearer ${apiKey}`;
+        }
+
+        const payload = {
+            "model": modelName,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        { "type": "text", "text": promptText },
+                        {
+                            "type": "image_url",
+                            "image_url": { "url": base64Data }
+                        }
+                    ]
+                }
+            ],
+            "response_format": { "type": "json_object" }
         };
 
-        let currentCat = null;
-        let currentMarket = [];
-        let sortKey = "price";
+        const response = await fetch(apiUrl, {
+            method: "POST",
+            headers: headers,
+            body: JSON.stringify(payload)
+        });
 
-        // ===== 頁面初始化：從 LocalStorage 載入緩存 =====
-        function loadCache(catId) {
-            const key = `marketData_${catId}`;
-            const cached = localStorage.getItem(key);
-            if (cached) {
-                try {
-                    const data = JSON.parse(cached);
-                    if (Array.isArray(data) && data.length > 0) {
-                        return data;
-                    }
-                } catch (e) { /* ignore */ }
-            }
-            return [];
+        if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(`API 請求失敗: ${response.status} - ${errText}`);
         }
 
-        function saveCache(catId, data) {
-            const key = `marketData_${catId}`;
-            localStorage.setItem(key, JSON.stringify(data));
+        const data = await response.json();
+        let replyText = data.choices[0].message.content;
+
+        // 清理可能被 Markdown 包裹的 JSON 字串
+        replyText = replyText.replace(/```json/g, "").replace(/```/g, "").trim();
+        
+        try {
+            const parsedResult = JSON.parse(replyText);
+            addRecord(parsedResult.meter_name, parsedResult.kwh);
+            statusMsg.innerText = "🎉 辨識成功並已記錄！";
+        } catch (e) {
+            console.error("JSON 解析失敗，原始回應:", replyText);
+            throw new Error("模型未依指定 JSON 格式回傳，請再試一次。");
         }
+    }
 
-        function selectCat(id) {
-            currentCat = id;
-            document.querySelectorAll('.c-btn').forEach(b => b.classList.remove('active'));
-            document.querySelector(`button[onclick="selectCat('${id}')"]`).classList.add('active');
+    // 新增紀錄到表格
+    function addRecord(name, kwh) {
+        const now = new Date();
+        const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+        
+        const newRecord = {
+            date: dateStr,
+            name: name || "未辨識出名稱",
+            kwh: kwh || "0"
+        };
 
-            document.getElementById('catDesc').textContent = `${CATEGORIES[id].label} (${Object.keys(CATEGORIES[id].stocks).length} 檔)`;
-            document.getElementById('syncBtn').style.display = 'block';
+        meterRecords.unshift(newRecord); // 最新拍的放在最上面
+        renderTable();
+    }
 
-            currentMarket = loadCache(id);
-            render();
-
-            if (currentMarket.length === 0) {
-                fetchAllData();
-            } else {
-                document.getElementById('updateTime').textContent =
-                    `上次數據: ${new Date().toLocaleTimeString()} (來自緩存)`;
-            }
-        }
-
-        // ===== 從 FinMind 獲取近四季 EPS 總和 =====
-        async function fetchEPS4Q(code) {
-            try {
-                const year = new Date().getFullYear() - 2;
-                const epsUrl =
-                    `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockEPS&data_id=${code}&start_date=${year}-01-01`;
-                const res = await fetch(epsUrl, { signal: AbortSignal.timeout(8000) });
-                if (!res.ok) return null;
-                const json = await res.json();
-                const validData = json.data.filter(item => item.EPS !== null && item.EPS !== undefined && !isNaN(Number(item.EPS)));
-                if (validData.length < 8) return null; // 需要至少 8 季才能計算年增率
-                const sorted = validData.sort((a, b) => new Date(b.date) - new Date(a.date));
-                
-                // 近四季 (index 0~3)
-                const recent4 = sorted.slice(0, 4);
-                const sum = recent4.reduce((s, item) => s + Number(item.EPS), 0);
-                return Math.round(sum * 100) / 100;
-            } catch (e) {
-                console.warn(`[${code}] EPS 撈取失敗:`, e.message);
-                return null;
-            }
-        }
-
-        // ===== 從 FinMind 獲取 EPS 年增率（用於計算 PEG） =====
-        async function fetchEPSGrowth(code) {
-            try {
-                const year = new Date().getFullYear() - 2;
-                const epsUrl =
-                    `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockEPS&data_id=${code}&start_date=${year}-01-01`;
-                const res = await fetch(epsUrl, { signal: AbortSignal.timeout(8000) });
-                if (!res.ok) return null;
-                const json = await res.json();
-                const validData = json.data.filter(item => item.EPS !== null && !isNaN(Number(item.EPS)));
-                if (validData.length < 8) return null;
-                const sorted = validData.sort((a, b) => new Date(b.date) - new Date(a.date));
-                const recent = sorted.slice(0, 8);
-                const epsRecent4 = recent.slice(0, 4).reduce((s, item) => s + Number(item.EPS), 0);
-                const epsLast4 = recent.slice(4, 8).reduce((s, item) => s + Number(item.EPS), 0);
-                if (epsLast4 === 0) {
-                    if (epsRecent4 > 0) return 999; // 轉盈
-                    return null;
-                }
-                let growth = (epsRecent4 - epsLast4) / Math.abs(epsLast4) * 100;
-                return Math.round(growth * 10) / 10;
-            } catch (e) {
-                console.warn(`[${code}] 成長率計算失敗:`, e.message);
-                return null;
-            }
-        }
-
-        // ===== 從 FinMind 獲取股價與 PER =====
-        async function fetchStockPriceAndPER(code) {
-            try {
-                const year = new Date().getFullYear() - 1;
-                const controller = new AbortController();
-                const timeout = setTimeout(() => controller.abort(), 10000);
-
-                const priceUrl =
-                    `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPrice&data_id=${code}&start_date=${year}-01-01`;
-                const perUrl =
-                    `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPER&data_id=${code}&start_date=${year}-01-01`;
-
-                const [pRes, vRes] = await Promise.all([
-                    fetch(priceUrl, { signal: controller.signal }),
-                    fetch(perUrl, { signal: controller.signal })
-                ]);
-
-                clearTimeout(timeout);
-
-                if (!pRes.ok || !vRes.ok) return null;
-
-                const pJson = await pRes.json();
-                const vJson = await vRes.json();
-
-                if (!pJson.data?.length) return null;
-
-                const last = pJson.data[pJson.data.length - 1];
-                const lastV = vJson.data?.[vJson.data.length - 1] || { PER: null };
-
-                const price = Number(last.close);
-                const open = Number(last.open);
-                const change = price - open;
-
-                let per = lastV?.PER;
-                if (!per || per <= 0 || per > 200) {
-                    per = null;
-                }
-
-                return { price, open, change, per };
-            } catch (e) {
-                console.warn(`[${code}] 股價/PER 撈取失敗:`, e.message);
-                return null;
-            }
-        }
-
-        // ===== 核心：撈取與計算 =====
-        async function fetchStock(code, name, retries = 2) {
-            for (let attempt = 0; attempt < retries; attempt++) {
-                try {
-                    // 同時撈取：股價+PER、EPS 總和、EPS 成長率
-                    const [pricePerData, eps4q, growth] = await Promise.all([
-                        fetchStockPriceAndPER(code),
-                        fetchEPS4Q(code),
-                        fetchEPSGrowth(code)
-                    ]);
-
-                    if (!pricePerData) {
-                        throw new Error('無法取得股價與 PER');
-                    }
-
-                    const { price, open, change, per } = pricePerData;
-
-                    // 計算 PEG (只有當 PER 和 Growth 都有有效值時)
-                    let peg = null;
-                    if (per !== null && growth !== null && growth >= 5) {
-                        peg = per / (growth / 100);
-                    }
-
-                    return {
-                        code,
-                        name,
-                        price,
-                        open,
-                        change,
-                        pct: open ? (change / open * 100).toFixed(2) : "0.00",
-                        per: per !== null ? Number(per).toFixed(2) : '--',
-                        eps: eps4q !== null ? eps4q.toFixed(2) : '--',
-                        peg: peg !== null ? Number(peg).toFixed(2) : null,
-                        source: 'FinMind',
-                        updateTime: '即時'
-                    };
-
-                } catch (e) {
-                    if (attempt === retries - 1) {
-                        console.warn(`[${code}] 最終失敗:`, e.message);
-                        return null;
-                    }
-                    await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
-                }
-            }
-        }
-
-        // ===== 同步主程序（並發控制） =====
-        async function fetchAllData() {
-            if (!currentCat) return;
-
-            const loading = document.getElementById("loading");
-            const progText = document.getElementById("progressText");
-            const syncBtn = document.getElementById("syncBtn");
-
-            loading.style.display = "flex";
-            syncBtn.disabled = true;
-
-            const stockList = CATEGORIES[currentCat].stocks;
-            const codes = Object.keys(stockList);
-            const results = [];
-            const failedList = [];
-
-            // 並發請求，控制同時 3 個
-            const chunkSize = 3;
-            for (let i = 0; i < codes.length; i += chunkSize) {
-                const batch = codes.slice(i, i + chunkSize);
-                const batchPromises = batch.map(async (code) => {
-                    progText.textContent =
-                        `同步中：${stockList[code]} (${i + 1}/${codes.length})`;
-                    const data = await fetchStock(code, stockList[code]);
-                    return { code, data };
-                });
-
-                const batchResults = await Promise.allSettled(batchPromises);
-                for (const result of batchResults) {
-                    if (result.status === 'fulfilled' && result.value.data) {
-                        results.push(result.value.data);
-                    } else if (result.status === 'fulfilled') {
-                        failedList.push(result.value.code);
-                    } else {
-                        failedList.push('unknown');
-                    }
-                }
-
-                // 批次間隔 300ms
-                await new Promise(r => setTimeout(r, 300));
-            }
-
-            currentMarket = results;
-            saveCache(currentCat, results);
-
-            document.getElementById("updateTime").textContent =
-                `最後更新: ${new Date().toLocaleTimeString()} (共 ${results.length} 檔)`;
-            loading.style.display = "none";
-            syncBtn.disabled = false;
-
-            if (results.length < codes.length) {
-                alert(`同步完成，但有 ${codes.length - results.length} 檔股票數據缺失。`);
-            }
-
-            render();
-        }
-
-        function setSort(key, btn) {
-            sortKey = key;
-            document.querySelectorAll(".sbtn").forEach(b => b.classList.remove("active"));
-            btn.classList.add('active');
-            render();
-        }
-
-        function render() {
-            const grid = document.getElementById("mainGrid");
-            const query = document.getElementById("searchInput").value.toLowerCase();
-
-            let filtered = currentMarket.filter(s => s.code.includes(query) || s.name.includes(query));
-
-            filtered.sort((a, b) => {
-                if (sortKey === "peg") {
-                    const pa = a.peg !== null ? parseFloat(a.peg) : 99999;
-                    const pb = b.peg !== null ? parseFloat(b.peg) : 99999;
-                    return pa - pb;
-                }
-                if (sortKey === "change") return (b.change / b.price) - (a.change / a.price);
-                return b.price - a.price;
-            });
-
-            if (filtered.length === 0 && currentCat) {
-                grid.innerHTML = `<div style="grid-column:1/-1; text-align:center; padding:80px; color:var(--dim);">尚無數據，請點擊「🚀 同步數據」。</div>`;
-                return;
-            }
-
-            grid.innerHTML = filtered.map(s => {
-                const isUp = s.change > 0;
-                const cClass = isUp ? "up" : (s.change < 0 ? "down" : "");
-
-                let pegDisplay, pegColor, pegStatus;
-                if (s.peg !== null && s.peg !== undefined) {
-                    const pegVal = parseFloat(s.peg);
-                    pegDisplay = pegVal.toFixed(2);
-                    if (pegVal < 1) {
-                        pegColor = "#34d399";
-                        pegStatus = "低估";
-                    } else if (pegVal <= 1.5) {
-                        pegColor = "#fbbf24";
-                        pegStatus = "合理";
-                    } else {
-                        pegColor = "#f87171";
-                        pegStatus = "偏貴";
-                    }
-                } else {
-                    pegDisplay = "N/A";
-                    pegColor = "#8b949e";
-                    pegStatus = "計算失敗";
-                }
-
-                return `
-              <div class="card">
-                <div class="card-header">
-                  <div>
-                    <div class="code">${s.code}</div>
-                    <div class="name">${s.name}</div>
-                  </div>
-                  <div class="peg-label" style="background:${pegColor}15; color:${pegColor}; border:1px solid ${pegColor}40;">
-                    PEG ${pegDisplay}<br><span style="font-size:0.6rem">${pegStatus}</span>
-                  </div>
-                </div>
-                <div class="price-row">
-                  <div class="price ${cClass}">${s.price.toFixed(1)}</div>
-                  <div class="change ${cClass}">${isUp ? '▲' : (s.change < 0 ? '▼' : '')} ${Math.abs(s.change).toFixed(1)} (${s.pct}%)</div>
-                </div>
-                <div class="source-tag">
-                  <span>📡 來源：${s.source} ${s.updateTime}</span>
-                </div>
-                <div class="value-grid">
-                  <div class="v-box"><span class="v-lbl">EPS (近四季)</span><span class="v-val">${s.eps}</span></div>
-                  <div class="v-box"><span class="v-lbl">本益比 PER</span><span class="v-val">${s.per}</span></div>
-                  <div class="v-box"><span class="v-lbl">預期成長</span><span class="v-val" style="color:#fbbf24">${s.peg !== null ? '已含在 PEG' : '--'}</span></div>
-                  <div class="v-box"><span class="v-lbl">監控</span><span class="v-val" style="color:var(--accent)">Active</span></div>
-                </div>
-              </div>
+    // 渲染表格內容
+    function renderTable() {
+        resultTable.innerHTML = "";
+        meterRecords.forEach(r => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${r.date}</td>
+                <td><strong>${r.name}</strong></td>
+                <td>${r.kwh}</td>
             `;
-            }).join("");
-        }
-    </script>
+            resultTable.appendChild(row);
+        });
+
+        recordCountSpan.innerText = meterRecords.length;
+        exportBtn.disabled = meterRecords.length === 0;
+    }
+
+    // 輸出 CSV 功能
+    exportBtn.addEventListener('click', () => {
+        if (meterRecords.length === 0) return;
+
+        // \uFEFF 是 UTF-8 的 BOM 頭，用來防止 Excel 開啟時中文變成亂碼
+        let csvContent = "\uFEFF";
+        csvContent += "日期時間,電表名稱,累計用電量(kWh)\n";
+
+        meterRecords.forEach(r => {
+            // 包裹雙引號防止內容包含逗號導致錯位
+            csvContent += `"${r.date}","${r.name}","${r.kwh}"\n`;
+        });
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        
+        const today = new Date().toISOString().slice(0, 10);
+        link.setAttribute("href", url);
+        link.setAttribute("download", `電表抄表統計結果_${today}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    });
+</script>
+
 </body>
 </html>
