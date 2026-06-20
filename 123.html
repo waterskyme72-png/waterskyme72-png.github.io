@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gemma 4 電表抄表小助手</title>
+    <title>Gemma 4 電表抄表助手</title>
     <style>
         :root {
             --primary: #2563eb;
@@ -41,13 +41,13 @@
             margin-bottom: 6px;
             font-size: 14px;
         }
-        input[type="text"], select {
+        input[type="text"] {
             width: 100%;
-            padding: 10px;
+            padding: 12px;
             border: 1px solid #cbd5e1;
             border-radius: 6px;
             box-sizing: border-box;
-            margin-bottom: 12px;
+            margin-bottom: 4px;
             font-size: 14px;
         }
         .btn {
@@ -62,15 +62,13 @@
             text-align: center;
             transition: background 0.2s;
         }
-        .btn-primary { background-color: var(--primary); color: white; }
-        .btn-primary:hover { background-color: #1d4ed8; }
-        .btn-success { background-color: var(--success); color: white; margin-top: 10px; }
+        .btn-success { background-color: var(--success); color: white; }
         .btn-success:hover { background-color: #15803d; }
         
         #camera-label {
             border: 2px dashed var(--primary);
             color: var(--primary);
-            padding: 24px;
+            padding: 32px 24px;
             text-align: center;
             border-radius: 8px;
             cursor: pointer;
@@ -123,17 +121,11 @@
 <body>
 
 <div class="container">
-    <h2>📊 Gemma 4 電表抄表系統</h2>
+    <h2>📊 Gemma 4 電表抄表助手</h2>
 
     <div class="card">
-        <label for="api-url">API 端點 URL (依環境自行修改)</label>
-        <input type="text" id="api-url" value="https://openrouter.ai/api/v1/chat/completions" placeholder="例如: http://localhost:11434/v1/chat/completions">
-        
-        <label for="api-model">Gemma 4 模型名稱</label>
-        <input type="text" id="api-model" value="google/gemma-4-31b-it:free" placeholder="例如: gemma4:latest">
-
-        <label for="api-key">Gemma 4 API Key</label>
-        <input type="text" id="api-key" placeholder="請輸入您的 API Key">
+        <label for="api-key">🔑 Gemma 4 API Key</label>
+        <input type="text" id="api-key" placeholder="請貼入您的 sk-or-v1-... 金鑰">
     </div>
 
     <div class="card">
@@ -170,6 +162,12 @@
 </div>
 
 <script>
+    // 后台固定設定：此處以 OpenRouter 平台上的 Gemma 4 為例
+    const CONFIG = {
+        apiUrl: "https://openrouter.ai/api/v1/chat/completions",
+        modelName: "google/gemma-4-31b-it:free"
+    };
+
     const cameraInput = document.getElementById('camera-input');
     const previewImg = document.getElementById('preview-img');
     const fileSizeInfo = document.getElementById('file-size-info');
@@ -178,31 +176,36 @@
     const recordCountSpan = document.getElementById('record-count');
     const exportBtn = document.getElementById('export-btn');
 
-    // 儲存所有抄表數據的陣列
     let meterRecords = [];
 
     cameraInput.addEventListener('change', async (e) => {
         const file = e.target.files[0];
         if (!file) return;
 
+        const apiKey = document.getElementById('api-key').value.trim();
+        if (!apiKey) {
+            alert("❌ 請先輸入您的 API Key 再進行拍照！");
+            statusMsg.innerText = "未填寫 API Key";
+            return;
+        }
+
         statusMsg.innerText = "正在壓縮圖片中...";
         
         try {
-            // 1. 壓縮圖片至 100KB 左右
+            // 1. 壓縮圖片至 100KB 上下
             const compressedBase64 = await compressImage(file);
             previewImg.src = compressedBase64;
             previewImg.style.display = 'block';
 
-            // 計算壓縮後的大小
             const approxSizeKb = Math.round((compressedBase64.length * 3) / 4 / 1024);
-            fileSizeInfo.innerText = `原始大小: ${Math.round(file.size / 1024)} KB -> 壓縮後: ~${approxSizeKb} KB`;
+            fileSizeInfo.innerText = `原始: ${Math.round(file.size / 1024)} KB -> 壓縮後: ~${approxSizeKb} KB`;
 
-            // 自動將壓縮後的照片下載/儲存至手機
+            // 自動儲存壓縮照片至手機
             saveImageToDevice(compressedBase64);
 
-            // 2. 呼叫 Gemma 4 API 進行辨識
+            // 2. 呼叫後台寫死的 Gemma 4 API
             statusMsg.innerText = "正在傳送至 Gemma 4 進行多模態辨識...";
-            await callGemma4VisionAPI(compressedBase64);
+            await callGemma4VisionAPI(compressedBase64, apiKey);
 
         } catch (error) {
             console.error(error);
@@ -210,7 +213,6 @@
         }
     });
 
-    // 圖片壓縮邏輯
     function compressImage(file) {
         return new Promise((resolve) => {
             const reader = new FileReader();
@@ -223,7 +225,6 @@
                     let width = img.width;
                     let height = img.height;
 
-                    // 限制最大邊長為 1000 像素，可將體積控制在 100KB 上下
                     const MAX_BOUND = 1000;
                     if (width > height) {
                         if (width > MAX_BOUND) {
@@ -242,7 +243,6 @@
                     const ctx = canvas.getContext('2d');
                     ctx.drawImage(img, 0, 0, width, height);
 
-                    // 以 JPEG 格式輸出，品質設為 0.65
                     const dataUrl = canvas.toDataURL('image/jpeg', 0.65);
                     resolve(dataUrl);
                 };
@@ -250,7 +250,6 @@
         });
     }
 
-    // 儲存照片到手機的函式 (觸發瀏覽器下載)
     function saveImageToDevice(base64Data) {
         const link = document.createElement('a');
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -261,27 +260,16 @@
         document.body.removeChild(link);
     }
 
-    // 呼叫 Gemma 4 多模態 API
-    async function callGemma4VisionAPI(base64Data) {
-        const apiUrl = document.getElementById('api-url').value;
-        const modelName = document.getElementById('api-model').value;
-        const apiKey = document.getElementById('api-key').value;
-
-        if (!apiKey && apiUrl.includes("openrouter")) {
-            throw new Error("請先輸入您的 API Key！");
-        }
-
+    async function callGemma4VisionAPI(base64Data, apiKey) {
         const promptText = "這是電表照片。右側通常有白底紅字的貼紙（包含電表名稱）。請精確提取兩項資訊：\n1. 累積用電量 (kwh)\n2. 標籤中的電表名稱（例如 N6 5F LLO）。\n請務必『嚴格』以 JSON 格式輸出，不需任何額外的解釋文字。格式如下：\n{\n  \"meter_name\": \"提取的名稱\",\n  \"kwh\": \"提取的數字，包含小數點\"\n}";
 
         const headers = {
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${apiKey}`
         };
-        if (apiKey) {
-            headers["Authorization"] = `Bearer ${apiKey}`;
-        }
 
         const payload = {
-            "model": modelName,
+            "model": CONFIG.modelName,
             "messages": [
                 {
                     "role": "user",
@@ -297,7 +285,7 @@
             "response_format": { "type": "json_object" }
         };
 
-        const response = await fetch(apiUrl, {
+        const response = await fetch(CONFIG.apiUrl, {
             method: "POST",
             headers: headers,
             body: JSON.stringify(payload)
@@ -311,7 +299,6 @@
         const data = await response.json();
         let replyText = data.choices[0].message.content;
 
-        // 清理可能被 Markdown 包裹的 JSON 字串
         replyText = replyText.replace(/```json/g, "").replace(/```/g, "").trim();
         
         try {
@@ -324,7 +311,6 @@
         }
     }
 
-    // 新增紀錄到表格
     function addRecord(name, kwh) {
         const now = new Date();
         const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
@@ -335,11 +321,10 @@
             kwh: kwh || "0"
         };
 
-        meterRecords.unshift(newRecord); // 最新拍的放在最上面
+        meterRecords.unshift(newRecord);
         renderTable();
     }
 
-    // 渲染表格內容
     function renderTable() {
         resultTable.innerHTML = "";
         meterRecords.forEach(r => {
@@ -356,16 +341,13 @@
         exportBtn.disabled = meterRecords.length === 0;
     }
 
-    // 輸出 CSV 功能
     exportBtn.addEventListener('click', () => {
         if (meterRecords.length === 0) return;
 
-        // \uFEFF 是 UTF-8 的 BOM 頭，用來防止 Excel 開啟時中文變成亂碼
         let csvContent = "\uFEFF";
         csvContent += "日期時間,電表名稱,累計用電量(kWh)\n";
 
         meterRecords.forEach(r => {
-            // 包裹雙引號防止內容包含逗號導致錯位
             csvContent += `"${r.date}","${r.name}","${r.kwh}"\n`;
         });
 
