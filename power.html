@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📊 Gemini 電表抄表助手 (智能命名版)</title>
+    <style>
+        :root { 
+            --primary: #2563eb; 
+            --success: #16a34a; 
+            --teal: #0d9488;
+            --bg: #f8fafc; 
+            --card: #ffffff; 
+            --text: #1e293b; 
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background-color: var(--bg); color: var(--text); padding: 16px; margin: 0; }
+        .container { max-width: 600px; margin: 0 auto; }
+        h2 { text-align: center; color: var(--primary); margin-bottom: 20px; }
+        .card { background: var(--card); border-radius: 12px; padding: 16px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); margin-bottom: 16px; }
+        label { display: block; font-weight: bold; margin-bottom: 6px; font-size: 14px; }
+        input[type="text"] { width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; font-size: 14px; }
+        .btn { display: block; width: 100%; padding: 12px; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; text-align: center; }
+        .btn-success { background-color: var(--success); color: white; }
+        
+        .action-group { display: flex; gap: 12px; }
+        .action-group label {
+            flex: 1; padding: 24px 12px; text-align: center; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 15px; margin: 0;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+        }
+        #camera-label { border: 2px dashed var(--primary); color: var(--primary); background-color: #eff6ff; }
+        #upload-label { border: 2px dashed var(--teal); color: var(--teal); background-color: #f0fdfa; }
+        #camera-input, #upload-input { display: none; }
+        
+        .preview-box { text-align: center; margin-top: 12px; }
+        #preview-img { max-width: 100%; max-height: 200px; border-radius: 6px; display: none; }
+        .info-text { font-size: 12px; color: #64748b; margin-top: 4px; }
+        .table-container { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 14px; }
+        th, td { border: 1px solid #e2e8f0; padding: 10px; text-align: left; }
+        th { background-color: #f1f5f9; }
+        .status { text-align: center; font-weight: bold; color: var(--primary); margin: 10px 0; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>📊 Gemini 電表抄表助手</h2>
+
+    <div class="card">
+        <label for="api-key">🔑 Gemini (Google AI Studio) API Key</label>
+        <input type="text" id="api-key" placeholder="請貼入您的 AIzaSy... 金鑰">
+    </div>
+
+    <div class="card">
+        <label style="margin-bottom: 12px;">📸 請選擇影像來源進行辨識</label>
+        <div class="action-group">
+            <label id="camera-label" for="camera-input"><span>📸 現場拍照</span></label>
+            <input type="file" id="camera-input" accept="image/*" capture="environment">
+            
+            <label id="upload-label" for="upload-input"><span>📁 相簿上傳</span></label>
+            <input type="file" id="upload-input" accept="image/*">
+        </div>
+        
+        <div class="preview-box">
+            <img id="preview-img" alt="電表預覽">
+            <div id="file-size-info" class="info-text"></div>
+        </div>
+        <div id="status-msg" class="status"></div>
+    </div>
+
+    <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <label style="margin: 0;">📋 辨識紀錄列表 (<span id="record-count">0</span>)</label>
+            <button class="btn btn-success" id="export-btn" style="width: auto; padding: 6px 12px; margin: 0;" disabled>輸出全部 CSV</button>
+        </div>
+        <div class="table-container">
+            <table id="result-table">
+                <thead>
+                    <tr><th>日期時間</th><th>電表名稱</th><th>累計用電量 (kWh)</th></tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    const CONFIG = {
+        apiUrl: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+        modelName: "gemini-2.5-flash"
+    };
+
+    const cameraInput = document.getElementById('camera-input');
+    const uploadInput = document.getElementById('upload-input');
+    const previewImg = document.getElementById('preview-img');
+    const fileSizeInfo = document.getElementById('file-size-info');
+    const statusMsg = document.getElementById('status-msg');
+    const resultTable = document.getElementById('result-table').querySelector('tbody');
+    const recordCountSpan = document.getElementById('record-count');
+    const exportBtn = document.getElementById('export-btn');
+
+    let meterRecords = [];
+
+    async function processImageFile(file) {
+        if (!file) return;
+
+        const apiKey = document.getElementById('api-key').value.trim();
+        if (!apiKey) {
+            alert("❌ 請先輸入您的 API Key 再進行操作！");
+            statusMsg.innerText = "未填寫 API Key";
+            return;
+        }
+
+        statusMsg.innerText = "正在壓縮圖片中...";
+        
+        try {
+            const compressedBase64 = await compressImage(file);
+            previewImg.src = compressedBase64;
+            previewImg.style.display = 'block';
+
+            const approxSizeKb = Math.round((compressedBase64.length * 3) / 4 / 1024);
+            fileSizeInfo.innerText = `原始: ${Math.round(file.size / 1024)} KB -> 壓縮後: ~${approxSizeKb} KB`;
+
+            // 【邏輯調整】這裡不再先存檔，改由 API 回傳結果後，在 callGeminiVisionAPI 內部進行存檔
+            statusMsg.innerText = "正在傳送至 Gemini 進行多模態辨識...";
+            await callGeminiVisionAPI(compressedBase64, apiKey);
+
+        } catch (error) {
+            console.error(error);
+            statusMsg.innerText = `錯誤: ${error.message}`;
+        }
+    }
+
+    cameraInput.addEventListener('change', (e) => { processImageFile(e.target.files[0]); });
+    uploadInput.addEventListener('change', (e) => {
+        processImageFile(e.target.files[0]);
+        uploadInput.value = ""; 
+    });
+
+    function compressImage(file) {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = function (event) {
+                const img = new Image();
+                img.src = event.target.result;
+                img.onload = function () {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+                    const MAX_BOUND = 1000;
+                    if (width > height) { if (width > MAX_BOUND) { height *= MAX_BOUND / width; width = MAX_BOUND; } }
+                    else { if (height > MAX_BOUND) { width *= MAX_BOUND / height; height = MAX_BOUND; } }
+                    canvas.width = width; canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    resolve(canvas.toDataURL('image/jpeg', 0.65));
+                };
+            };
+        });
+    }
+
+    // 更新：現在接收辨識出的電表名稱作為檔名的一部分
+    function saveImageToDevice(base64Data, meterName) {
+        const link = document.createElement('a');
+        
+        // 格式化時間 (格式如: 20260622_1630) 附加在檔名後面，避免同電表重複拍照時覆蓋
+        const now = new Date();
+        const timestamp = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
+        
+        // 安全過濾：移除檔名不允許的特殊字元 \ / : * ? " < > | 空格，改用底線代替
+        const safeMeterName = (meterName || "未辨識出名稱").trim().replace(/[\s/\\?%*:|"<>]/g, '_');
+
+        link.href = base64Data;
+        link.download = `${safeMeterName}_${timestamp}.jpg`; // 檔名範例：N6_5F_LLO_20260622_1630.jpg
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    async function callGeminiVisionAPI(base64Data, apiKey) {
+        const promptText = "這是電表照片。右側通常有白底紅字的貼紙（包含電表名稱）。請精確提取兩項資訊：\n1. 累積用電量 (kwh)\n2. 標籤中的電表名稱（例如 N6 5F LLO）。\n請務必『嚴格』以 JSON 格式輸出，不需 any 額外的解釋文字。格式如下：\n{\n  \"meter_name\": \"提取的名稱\",\n  \"kwh\": \"提取的數字，包含小數點\"\n}";
+
+        const response = await fetch(CONFIG.apiUrl, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                "model": CONFIG.modelName,
+                "messages": [{
+                    "role": "user",
+                    "content": [
+                        { "type": "text", "text": promptText },
+                        { "type": "image_url", "image_url": { "url": base64Data } }
+                    ]
+                }],
+                "response_format": { "type": "json_object" }
+            })
+        });
+
+        if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(`API 請求失敗: ${response.status} - ${errText}`);
+        }
+
+        const data = await response.json();
+        let replyText = data.choices[0].message.content.replace(/```json/g, "").replace(/```/g, "").trim();
+        
+        try {
+            const parsedResult = JSON.parse(replyText);
+            
+            // 【核心變更】在這裡成功拿到 AI 解析的 json 資料後，才呼叫存檔，並傳入電表名稱
+            saveImageToDevice(base64Data, parsedResult.meter_name);
+            
+            addRecord(parsedResult.meter_name, parsedResult.kwh);
+            statusMsg.innerText = "🎉 辨識成功！照片已自動命名並下載。";
+        } catch (e) {
+            throw new Error("模型未依指定 JSON 格式回傳，請再試一次。");
+        }
+    }
+
+    function addRecord(name, kwh) {
+        const now = new Date();
+        const dateStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+        meterRecords.unshift({ date: dateStr, name: name || "未辨識出名稱", kwh: kwh || "0" });
+        renderTable();
+    }
+
+    function renderTable() {
+        resultTable.innerHTML = "";
+        meterRecords.forEach(r => {
+            const row = document.createElement('tr');
+            row.innerHTML = `<td>${r.date}</td><td><strong>${r.name}</strong></td><td>${r.kwh}</td>`;
+            resultTable.appendChild(row);
+        });
+        recordCountSpan.innerText = meterRecords.length;
+        exportBtn.disabled = meterRecords.length === 0;
+    }
+
+    exportBtn.addEventListener('click', () => {
+        if (meterRecords.length === 0) return;
+        let csvContent = "\uFEFF日期時間,電表名稱,累計用電量(kWh)\n";
+        meterRecords.forEach(r => { csvContent += `"${r.date}","${r.name}","${r.kwh}"\n`; });
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", `電表抄表統計結果_${new Date().toISOString().slice(0, 10)}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    });
+</script>
+
+</body>
+</html>
