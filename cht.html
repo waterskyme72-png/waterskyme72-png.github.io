@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude Chat</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --bg:#0c0c10;
+  --surface:#131318;
+  --surface-2:#1b1b22;
+  --border:#26263a;
+  --accent:#c9785c;
+  --accent-dim:#8b4a30;
+  --accent-glow:rgba(201,120,92,0.22);
+  --text:#edeae4;
+  --text-muted:#7a776f;
+  --text-dim:#4e4c47;
+  --user-bg:#171c38;
+  --user-border:#24285a;
+  --sidebar-w:268px;
+  --r:10px;
+  --r-sm:6px;
+}
+
+html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.6}
+
+/* ── Layout ── */
+.app{display:flex;height:100vh;overflow:hidden}
+
+/* ── Sidebar ── */
+.sidebar{
+  width:var(--sidebar-w);min-width:var(--sidebar-w);
+  background:var(--surface);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;padding:16px 12px 12px;gap:18px;
+  overflow-y:auto;transition:transform .22s ease;
+}
+.sidebar::-webkit-scrollbar{width:3px}
+.sidebar::-webkit-scrollbar-thumb{background:var(--border);border-radius:9px}
+
+.logo{display:flex;align-items:center;gap:9px;padding:2px 4px}
+.logo-mark{
+  width:30px;height:30px;border-radius:8px;flex-shrink:0;
+  background:linear-gradient(140deg,var(--accent) 0%,var(--accent-dim) 100%);
+  display:flex;align-items:center;justify-content:center;font-size:15px;
+}
+.logo-name{font-size:15px;font-weight:650;letter-spacing:-.3px}
+.logo-name span{color:var(--accent)}
+
+.s-section{display:flex;flex-direction:column;gap:6px}
+
+.s-label{
+  font-size:10.5px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.09em;color:var(--text-dim);padding:0 4px;
+  display:flex;align-items:center;justify-content:space-between;
+}
+
+/* Controls */
+select,input,textarea{
+  width:100%;background:var(--surface-2);border:1px solid var(--border);
+  border-radius:var(--r-sm);color:var(--text);font-family:inherit;
+  font-size:13px;padding:8px 10px;outline:none;
+  transition:border-color .15s,box-shadow .15s;
+}
+select:focus,input:focus,textarea:focus{
+  border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-glow);
+}
+select{cursor:pointer;appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237a776f' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 9px center;padding-right:28px;
+}
+select option{background:var(--surface-2)}
+textarea{resize:vertical;min-height:76px;max-height:180px;line-height:1.5}
+
+.model-badge{
+  font-size:10px;padding:2px 7px;border-radius:20px;font-weight:600;
+  background:rgba(201,120,92,.13);color:var(--accent);
+}
+
+/* API key row */
+.key-wrap{position:relative}
+.key-wrap input{padding-right:38px}
+.key-toggle{
+  position:absolute;right:9px;top:50%;transform:translateY(-50%);
+  background:none;border:none;color:var(--text-muted);cursor:pointer;
+  padding:3px;display:flex;align-items:center;line-height:1;
+}
+.key-toggle:hover{color:var(--text)}
+.key-toggle svg{width:15px;height:15px}
+
+.key-notice{
+  font-size:11px;color:var(--text-dim);line-height:1.45;padding:0 2px;
+}
+
+/* Sidebar buttons */
+.s-actions{display:flex;flex-direction:column;gap:6px;margin-top:auto;padding-top:8px;border-top:1px solid var(--border)}
+
+.s-btn{
+  display:flex;align-items:center;gap:7px;padding:7px 10px;
+  border-radius:var(--r-sm);font-size:12.5px;font-weight:500;
+  cursor:pointer;transition:all .15s;border:1px solid var(--border);
+  background:transparent;color:var(--text-muted);width:100%;
+}
+.s-btn:hover{background:var(--surface-2);color:var(--text)}
+.s-btn.danger{color:#d95c5c;border-color:#321a1a}
+.s-btn.danger:hover{background:#1e0f0f}
+.s-btn svg{width:14px;height:14px;flex-shrink:0}
+
+/* ── Main ── */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+
+/* ── Messages ── */
+.messages{flex:1;overflow-y:auto;padding:28px 0 8px}
+.messages::-webkit-scrollbar{width:5px}
+.messages::-webkit-scrollbar-track{background:transparent}
+.messages::-webkit-scrollbar-thumb{background:var(--border);border-radius:9px}
+.messages::-webkit-scrollbar-thumb:hover{background:var(--text-dim)}
+
+/* Empty */
+.empty{
+  display:flex;flex-direction:column;align-items:center;
+  justify-content:center;height:100%;gap:14px;text-align:center;padding:40px;
+}
+.empty-icon{
+  width:60px;height:60px;border-radius:16px;
+  background:linear-gradient(140deg,var(--accent),var(--accent-dim));
+  display:flex;align-items:center;justify-content:center;font-size:28px;opacity:.65;
+}
+.empty h2{font-size:18px;font-weight:600;color:var(--text-muted)}
+.empty p{font-size:13px;color:var(--text-dim);max-width:300px;line-height:1.6}
+.empty-hints{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:4px}
+.empty-hint{
+  font-size:12px;padding:6px 12px;border-radius:20px;
+  border:1px solid var(--border);color:var(--text-muted);
+  cursor:pointer;transition:all .15s;background:var(--surface);
+}
+.empty-hint:hover{border-color:var(--accent);color:var(--text)}
+
+/* Message rows */
+.msg-row{display:flex;flex-direction:column;padding:2px 28px;gap:3px}
+.msg-row.user{align-items:flex-end}
+.msg-row.assistant{align-items:flex-start}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+.msg-row{animation:fadeUp .18s ease}
+
+.msg-meta{font-size:10.5px;color:var(--text-dim);padding:0 4px;margin-bottom:1px}
+
+.msg-bubble{
+  max-width:min(700px,86%);padding:11px 15px;border-radius:var(--r);
+  position:relative;line-height:1.65;
+}
+.msg-row.user .msg-bubble{
+  background:var(--user-bg);border:1px solid var(--user-border);
+  border-radius:var(--r) var(--r) 2px var(--r);
+}
+.msg-row.assistant .msg-bubble{
+  background:var(--surface-2);border:1px solid var(--border);
+  border-radius:var(--r) var(--r) var(--r) 2px;
+}
+
+.msg-actions{display:flex;gap:2px;padding:2px 4px;opacity:0;transition:opacity .15s}
+.msg-row:hover .msg-actions{opacity:1}
+.act-btn{
+  background:none;border:none;cursor:pointer;color:var(--text-dim);
+  padding:3px 7px;border-radius:4px;font-size:11px;transition:all .15s;
+}
+.act-btn:hover{background:var(--surface-2);color:var(--text-muted)}
+
+/* Streaming cursor */
+.cursor::after{
+  content:'▋';animation:blink .65s steps(1) infinite;
+  color:var(--accent);font-size:.9em;
+}
+@keyframes blink{50%{opacity:0}}
+
+/* ── Markdown ── */
+.md{word-break:break-word}
+.md p{margin-bottom:10px}
+.md p:last-child{margin-bottom:0}
+.md h1,.md h2,.md h3,.md h4{font-weight:650;line-height:1.3;margin:14px 0 7px}
+.md h1{font-size:1.28em}
+.md h2{font-size:1.14em}
+.md h3{font-size:1.04em}
+.md ul,.md ol{margin:5px 0 10px 20px}
+.md li{margin-bottom:4px}
+.md li>ul,.md li>ol{margin-top:4px;margin-bottom:4px}
+.md code{
+  font-family:'SF Mono','Cascadia Code',Consolas,monospace;font-size:.855em;
+  background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);
+  padding:1px 5px;border-radius:4px;
+}
+.md pre{
+  background:#09090f;border:1px solid var(--border);border-radius:var(--r-sm);
+  padding:14px 16px;overflow-x:auto;margin:10px 0;position:relative;
+}
+.md pre code{
+  background:none;border:none;padding:0;font-size:.83em;
+  line-height:1.75;color:#b4c2d8;
+}
+.code-hd{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:6px 12px 0;
+}
+.code-lang{font-size:10.5px;color:var(--text-dim);font-family:monospace}
+.copy-code{
+  font-size:10.5px;padding:2px 8px;border-radius:4px;cursor:pointer;
+  background:var(--surface);border:1px solid var(--border);color:var(--text-muted);
+  transition:all .15s;
+}
+.copy-code:hover{background:var(--surface-2);color:var(--text)}
+.md strong{font-weight:650}
+.md em{font-style:italic;color:#c4bdb0}
+.md blockquote{
+  border-left:3px solid var(--accent);padding-left:13px;
+  margin:8px 0;color:var(--text-muted);font-style:italic;
+}
+.md hr{border:none;border-top:1px solid var(--border);margin:14px 0}
+.md a{color:var(--accent);text-decoration:none}
+.md a:hover{text-decoration:underline}
+.md table{border-collapse:collapse;width:100%;margin:10px 0;font-size:.9em}
+.md th,.md td{border:1px solid var(--border);padding:6px 12px;text-align:left}
+.md th{background:var(--surface);font-weight:600}
+.md tr:nth-child(even) td{background:rgba(255,255,255,.02)}
+
+/* ── Input ── */
+.input-area{padding:14px 28px 20px;border-top:1px solid var(--border)}
+
+.input-box{
+  display:flex;gap:10px;align-items:flex-end;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:13px;padding:10px 12px;
+  transition:border-color .2s,box-shadow .2s;
+}
+/* ★ Signature: coral glow when focused */
+.input-box:focus-within{
+  border-color:var(--accent);
+  box-shadow:0 0 0 3px var(--accent-glow),0 2px 12px rgba(201,120,92,.08);
+}
+
+.chat-input{
+  flex:1;background:none;border:none;color:var(--text);
+  font-family:inherit;font-size:14px;line-height:1.55;
+  resize:none;min-height:24px;max-height:176px;padding:0;outline:none;
+}
+.chat-input::placeholder{color:var(--text-dim)}
+
+.send-btn{
+  background:var(--accent);border:none;border-radius:8px;
+  width:34px;height:34px;display:flex;align-items:center;justify-content:center;
+  cursor:pointer;color:#fff;flex-shrink:0;align-self:flex-end;
+  transition:background .15s,transform .1s,opacity .15s;
+}
+.send-btn:hover{background:var(--accent-dim);transform:scale(1.06)}
+.send-btn:disabled{opacity:.3;cursor:not-allowed;transform:none}
+.send-btn svg{width:16px;height:16px}
+
+.input-hint{
+  text-align:center;font-size:11px;color:var(--text-dim);margin-top:8px;
+}
+
+/* Status bar */
+.status{
+  padding:8px 28px;font-size:12px;
+  display:none;animation:fadeUp .2s ease;
+}
+.status.error{display:block;color:#e05a5a;background:#160808;border-top:1px solid #2e0e0e}
+.status.warn{display:block;color:#c49a3c;background:#12100a;border-top:1px solid #2a240e}
+
+/* Mobile menu toggle */
+.menu-toggle{
+  display:none;position:fixed;top:12px;left:12px;z-index:200;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:8px;width:36px;height:36px;
+  align-items:center;justify-content:center;cursor:pointer;color:var(--text-muted);
+}
+.menu-toggle:hover{color:var(--text)}
+.overlay{
+  display:none;position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.5);
+}
+
+@media(max-width:700px){
+  .sidebar{position:fixed;top:0;left:0;height:100vh;z-index:150;transform:translateX(-100%)}
+  .sidebar.open{transform:translateX(0)}
+  .menu-toggle{display:flex}
+  .overlay.show{display:block}
+  .msg-row{padding:2px 16px}
+  .input-area{padding:12px 16px 18px}
+  .main{padding-top:0}
+}
+
+/* Theme: scrollbar for firefox */
+.messages,.sidebar{scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+</style>
+</head>
+<body>
+
+<button class="menu-toggle" id="menuToggle" title="Open menu">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+</button>
+<div class="overlay" id="overlay"></div>
+
+<div class="app">
+
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar" id="sidebar">
+
+    <div class="logo">
+      <div class="logo-mark">✦</div>
+      <div class="logo-name">Claude<span>Chat</span></div>
+    </div>
+
+    <!-- Model -->
+    <div class="s-section">
+      <div class="s-label">
+        Model
+        <span class="model-badge" id="tierBadge">Sonnet</span>
+      </div>
+      <select id="modelSelect">
+        <optgroup label="── Opus (Most Capable) ──">
+          <option value="claude-opus-4-8">Claude Opus 4.8</option>
+          <option value="claude-opus-4-7">Claude Opus 4.7</option>
+          <option value="claude-opus-4-6">Claude Opus 4.6</option>
+        </optgroup>
+        <optgroup label="── Sonnet (Balanced) ──">
+          <option value="claude-sonnet-4-6" selected>Claude Sonnet 4.6</option>
+        </optgroup>
+        <optgroup label="── Haiku (Fastest) ──">
+          <option value="claude-haiku-4-5-20251001">Claude Haiku 4.5</option>
+        </optgroup>
+      </select>
+    </div>
+
+    <!-- API Key -->
+    <div class="s-section">
+      <div class="s-label">API Key</div>
+      <div class="key-wrap">
+        <input type="password" id="apiKey" placeholder="sk-ant-api03-..." autocomplete="off" spellcheck="false">
+        <button class="key-toggle" id="keyToggle" title="Show/hide key">
+          <svg id="eyeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+          </svg>
+        </button>
+      </div>
+      <p class="key-notice">儲存於 localStorage。勿與他人分享此頁面。</p>
+    </div>
+
+    <!-- System Prompt -->
+    <div class="s-section">
+      <div class="s-label">System Prompt <span style="color:var(--accent);font-size:9px;font-weight:500;text-transform:none;letter-spacing:0">(optional)</span></div>
+      <textarea id="systemPrompt" placeholder="You are a helpful assistant…" rows="3"></textarea>
+    </div>
+
+    <!-- Max Tokens -->
+    <div class="s-section">
+      <div class="s-label">Max Output Tokens</div>
+      <select id="maxTokens">
+        <option value="1024">1,024</option>
+        <option value="2048">2,048</option>
+        <option value="4096" selected>4,096</option>
+        <option value="8192">8,192</option>
+        <option value="16384">16,384</option>
+      </select>
+    </div>
+
+    <!-- Actions -->
+    <div class="s-actions">
+      <button class="s-btn" id="newChatBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        New Conversation
+      </button>
+      <button class="s-btn" id="exportBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Export Chat (.md)
+      </button>
+      <button class="s-btn danger" id="clearKeyBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
+        Clear API Key
+      </button>
+    </div>
+
+  </aside>
+
+  <!-- ── Main ── -->
+  <div class="main">
+
+    <div class="messages" id="messages">
+      <div class="empty" id="emptyState">
+        <div class="empty-icon">✦</div>
+        <h2>Start a conversation</h2>
+        <p>Enter your Anthropic API key in the sidebar, choose a model, and start chatting.</p>
+        <div class="empty-hints">
+          <div class="empty-hint" onclick="fillPrompt('幫我解釋量子糾纏的原理')">解釋量子糾纏</div>
+          <div class="empty-hint" onclick="fillPrompt('Write a Python web scraper for news headlines')">Python web scraper</div>
+          <div class="empty-hint" onclick="fillPrompt('幫我潤飾以下段落，讓它更簡潔有力：')">潤飾文章段落</div>
+          <div class="empty-hint" onclick="fillPrompt('Explain the difference between TCP and UDP')">TCP vs UDP</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="status" id="statusBar"></div>
+
+    <div class="input-area">
+      <div class="input-box">
+        <textarea class="chat-input" id="chatInput" placeholder="Message Claude… (Enter to send, Shift+Enter for newline)" rows="1"></textarea>
+        <button class="send-btn" id="sendBtn" title="Send">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+          </svg>
+        </button>
+      </div>
+      <div class="input-hint">Claude can make mistakes. Verify important information.</div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+let messages = [];
+let isStreaming = false;
+
+// ── DOM ────────────────────────────────────────────────────────────────────
+const $   = id => document.getElementById(id);
+const messagesEl  = $('messages');
+const emptyEl     = $('emptyState');
+const chatInput   = $('chatInput');
+const sendBtn     = $('sendBtn');
+const apiKeyEl    = $('apiKey');
+const modelEl     = $('modelSelect');
+const systemEl    = $('systemPrompt');
+const maxTokEl    = $('maxTokens');
+const statusEl    = $('statusBar');
+const tierBadge   = $('tierBadge');
+const sidebar     = $('sidebar');
+const overlay     = $('overlay');
+
+// ── Init ───────────────────────────────────────────────────────────────────
+(function init() {
+  apiKeyEl.value  = localStorage.getItem('cc_key')    || '';
+  systemEl.value  = localStorage.getItem('cc_system') || '';
+  const saved = localStorage.getItem('cc_model');
+  if (saved) modelEl.value = saved;
+  const savedTok = localStorage.getItem('cc_maxtok');
+  if (savedTok) maxTokEl.value = savedTok;
+  updateBadge();
+})();
+
+// ── Sidebar mobile ─────────────────────────────────────────────────────────
+$('menuToggle').addEventListener('click', () => {
+  sidebar.classList.toggle('open');
+  overlay.classList.toggle('show');
+});
+overlay.addEventListener('click', closeSidebar);
+function closeSidebar() {
+  sidebar.classList.remove('open');
+  overlay.classList.remove('show');
+}
+
+// ── Model badge ────────────────────────────────────────────────────────────
+modelEl.addEventListener('change', () => {
+  localStorage.setItem('cc_model', modelEl.value);
+  updateBadge();
+});
+function updateBadge() {
+  const v = modelEl.value;
+  const t = v.includes('opus') ? 'Opus' : v.includes('sonnet') ? 'Sonnet' : 'Haiku';
+  tierBadge.textContent = t;
+}
+
+maxTokEl.addEventListener('change', () => localStorage.setItem('cc_maxtok', maxTokEl.value));
+
+// ── API key toggle ─────────────────────────────────────────────────────────
+let keyVisible = false;
+$('keyToggle').addEventListener('click', () => {
+  keyVisible = !keyVisible;
+  apiKeyEl.type = keyVisible ? 'text' : 'password';
+  $('eyeIcon').innerHTML = keyVisible
+    ? `<path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>`
+    : `<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>`;
+});
+apiKeyEl.addEventListener('input', () => localStorage.setItem('cc_key', apiKeyEl.value.trim()));
+systemEl.addEventListener('input', () => localStorage.setItem('cc_system', systemEl.value));
+
+// ── Clear / New / Export ───────────────────────────────────────────────────
+$('clearKeyBtn').addEventListener('click', () => {
+  if (!confirm('Clear stored API key?')) return;
+  localStorage.removeItem('cc_key');
+  apiKeyEl.value = '';
+  showStatus('API key cleared.', 'warn');
+});
+
+$('newChatBtn').addEventListener('click', () => {
+  if (messages.length && !confirm('Start a new conversation? Current chat will be lost.')) return;
+  messages = [];
+  renderMessages();
+  closeSidebar();
+});
+
+$('exportBtn').addEventListener('click', exportChat);
+
+function exportChat() {
+  if (!messages.length) { showStatus('Nothing to export yet.', 'warn'); return; }
+  const model = modelEl.value;
+  let md = `# Claude Chat Export\n**Model:** ${model}\n**Date:** ${new Date().toLocaleString()}\n\n---\n\n`;
+  messages.forEach(m => {
+    md += `## ${m.role === 'user' ? '🧑 User' : '✦ Claude'}\n\n${m.content}\n\n---\n\n`;
+  });
+  const blob = new Blob([md], { type: 'text/markdown' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `claude-chat-${Date.now()}.md`;
+  a.click();
+}
+
+// ── Status bar ─────────────────────────────────────────────────────────────
+let statusTimer;
+function showStatus(msg, type = 'error') {
+  clearTimeout(statusTimer);
+  statusEl.textContent = msg;
+  statusEl.className = 'status ' + type;
+  if (type !== 'error') statusTimer = setTimeout(() => statusEl.className = 'status', 3500);
+}
+function hideStatus() { statusEl.className = 'status'; }
+
+// ── Textarea auto-resize ───────────────────────────────────────────────────
+chatInput.addEventListener('input', autoResize);
+function autoResize() {
+  chatInput.style.height = 'auto';
+  chatInput.style.height = Math.min(chatInput.scrollHeight, 176) + 'px';
+}
+
+// ── Send on Enter ──────────────────────────────────────────────────────────
+chatInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+sendBtn.addEventListener('click', sendMessage);
+
+// ── Fill prompt from hints ─────────────────────────────────────────────────
+function fillPrompt(text) {
+  chatInput.value = text;
+  chatInput.focus();
+  autoResize();
+}
+
+// ── Render all messages ────────────────────────────────────────────────────
+function renderMessages() {
+  // Remove all message rows (keep empty state node)
+  [...messagesEl.querySelectorAll('.msg-row')].forEach(el => el.remove());
+
+  if (!messages.length) {
+    emptyEl.style.display = 'flex';
+    return;
+  }
+  emptyEl.style.display = 'none';
+
+  messages.forEach((msg, i) => {
+    messagesEl.appendChild(buildRow(msg, i));
+  });
+  scrollToBottom();
+}
+
+function buildRow(msg, idx) {
+  const row  = document.createElement('div');
+  row.className = 'msg-row ' + msg.role;
+  row.dataset.idx = idx;
+
+  const meta = document.createElement('div');
+  meta.className = 'msg-meta';
+  meta.textContent = msg.role === 'user' ? 'You' : modelEl.options[modelEl.selectedIndex]?.text || 'Claude';
+
+  const bubble = document.createElement('div');
+  bubble.className = 'msg-bubble';
+
+  const content = document.createElement('div');
+  content.className = 'md';
+
+  if (msg.role === 'user') {
+    content.textContent = msg.content; // plain text for user
+  } else {
+    content.innerHTML = parseMarkdown(msg.content);
+    if (msg.streaming) {
+      // Add blinking cursor to last text node
+      const cur = document.createElement('span');
+      cur.className = 'cursor';
+      content.appendChild(cur);
+    }
+    // Wire copy buttons
+    content.querySelectorAll('.copy-code').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const pre = btn.closest('.md pre');
+        const code = pre ? pre.querySelector('code')?.textContent : '';
+        copyText(code, btn);
+      });
+    });
+  }
+
+  bubble.appendChild(content);
+
+  const actions = document.createElement('div');
+  actions.className = 'msg-actions';
+
+  const copyBtn = document.createElement('button');
+  copyBtn.className = 'act-btn';
+  copyBtn.textContent = 'Copy';
+  copyBtn.addEventListener('click', () => copyText(msg.content, copyBtn));
+  actions.appendChild(copyBtn);
+
+  if (idx > 0) {
+    const delBtn = document.createElement('button');
+    delBtn.className = 'act-btn';
+    delBtn.textContent = 'Delete';
+    delBtn.addEventListener('click', () => {
+      messages.splice(idx, 1);
+      renderMessages();
+    });
+    actions.appendChild(delBtn);
+  }
+
+  row.appendChild(meta);
+  row.appendChild(bubble);
+  row.appendChild(actions);
+  return row;
+}
+
+// Update only the last assistant bubble (during streaming)
+function updateLast(content, streaming) {
+  const rows = messagesEl.querySelectorAll('.msg-row.assistant');
+  const last = rows[rows.length - 1];
+  if (!last) return;
+  const md = last.querySelector('.md');
+  if (!md) return;
+  md.innerHTML = parseMarkdown(content);
+  if (streaming) {
+    const cur = document.createElement('span');
+    cur.className = 'cursor';
+    md.appendChild(cur);
+  }
+  md.querySelectorAll('.copy-code').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const pre = btn.closest('pre');
+      const code = pre ? pre.querySelector('code')?.textContent : '';
+      copyText(code, btn);
+    });
+  });
+  scrollToBottom();
+}
+
+// ── Copy helper ────────────────────────────────────────────────────────────
+function copyText(text, btn) {
+  navigator.clipboard.writeText(text || '').then(() => {
+    const orig = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = orig; }, 1600);
+  });
+}
+
+// ── Scroll ─────────────────────────────────────────────────────────────────
+function scrollToBottom() {
+  requestAnimationFrame(() => {
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  });
+}
+
+// ── Send ───────────────────────────────────────────────────────────────────
+async function sendMessage() {
+  const text = chatInput.value.trim();
+  if (!text || isStreaming) return;
+
+  const key = apiKeyEl.value.trim();
+  if (!key) {
+    showStatus('❌ Please enter your Anthropic API key in the sidebar.');
+    return;
+  }
+
+  hideStatus();
+  messages.push({ role: 'user', content: text });
+  chatInput.value = '';
+  chatInput.style.height = '';
+
+  // Placeholder assistant message
+  const aMsg = { role: 'assistant', content: '', streaming: true };
+  messages.push(aMsg);
+  renderMessages();
+
+  isStreaming = true;
+  sendBtn.disabled = true;
+
+  try {
+    const body = {
+      model: modelEl.value,
+      max_tokens: parseInt(maxTokEl.value, 10),
+      stream: true,
+      messages: messages
+        .slice(0, -1)
+        .map(m => ({ role: m.role, content: m.content })),
+    };
+    const sys = systemEl.value.trim();
+    if (sys) body.system = sys;
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      let errMsg = `HTTP ${res.status}`;
+      try { const j = await res.json(); errMsg = j.error?.message || errMsg; } catch {}
+      throw new Error(errMsg);
+    }
+
+    const reader  = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop(); // keep incomplete line
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const raw = line.slice(6).trim();
+        if (!raw || raw === '[DONE]') continue;
+        try {
+          const evt = JSON.parse(raw);
+          if (
+            evt.type === 'content_block_delta' &&
+            evt.delta?.type === 'text_delta'
+          ) {
+            aMsg.content += evt.delta.text;
+            updateLast(aMsg.content, true);
+          }
+        } catch { /* ignore malformed SSE */ }
+      }
+    }
+
+  } catch (err) {
+    messages.pop(); // remove failed placeholder
+    renderMessages();
+    showStatus('❌ ' + err.message);
+    return;
+  } finally {
+    aMsg.streaming = false;
+    isStreaming = false;
+    sendBtn.disabled = false;
+    if (aMsg.content) updateLast(aMsg.content, false);
+    scrollToBottom();
+  }
+}
+
+// ── Markdown parser ─────────────────────────────────────────────────────────
+function parseMarkdown(raw) {
+  if (!raw) return '';
+
+  let html = '';
+  const lines = raw.split('\n');
+  let i = 0;
+  let inList = null; // 'ul' | 'ol' | null
+  let listBuf = '';
+
+  function flushList() {
+    if (!inList) return;
+    html += `<${inList}>${listBuf}</${inList}>`;
+    listBuf = ''; inList = null;
+  }
+
+  function inlineFormat(text) {
+    // Escape HTML first
+    text = text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    // Inline code (before bold/italic)
+    text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
+    // Bold+italic
+    text = text.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
+    // Bold
+    text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    text = text.replace(/__(.+?)__/g, '<strong>$1</strong>');
+    // Italic
+    text = text.replace(/\*([^*\n]+)\*/g, '<em>$1</em>');
+    text = text.replace(/_([^_\n]+)_/g, '<em>$1</em>');
+    // Strikethrough
+    text = text.replace(/~~(.+?)~~/g, '<del>$1</del>');
+    // Link
+    text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+    return text;
+  }
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    // ── Fenced code block ──────────────────────────────────────────
+    const fenceMatch = line.match(/^```(\w*)/);
+    if (fenceMatch) {
+      flushList();
+      const lang = fenceMatch[1] || '';
+      let code = '';
+      i++;
+      while (i < lines.length && !lines[i].startsWith('```')) {
+        code += lines[i] + '\n';
+        i++;
+      }
+      // escape code
+      const escaped = code.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      const hd = lang
+        ? `<div class="code-hd"><span class="code-lang">${lang}</span><button class="copy-code">Copy</button></div>`
+        : `<div class="code-hd"><span></span><button class="copy-code">Copy</button></div>`;
+      html += `<pre>${hd}<code>${escaped}</code></pre>`;
+      i++; continue;
+    }
+
+    // ── Headings ───────────────────────────────────────────────────
+    const h = line.match(/^(#{1,4})\s+(.+)/);
+    if (h) {
+      flushList();
+      const lvl = h[1].length;
+      html += `<h${lvl}>${inlineFormat(h[2])}</h${lvl}>`;
+      i++; continue;
+    }
+
+    // ── HR ─────────────────────────────────────────────────────────
+    if (/^(-{3,}|\*{3,}|_{3,})$/.test(line.trim())) {
+      flushList();
+      html += '<hr>';
+      i++; continue;
+    }
+
+    // ── Blockquote ─────────────────────────────────────────────────
+    if (line.startsWith('> ')) {
+      flushList();
+      html += `<blockquote>${inlineFormat(line.slice(2))}</blockquote>`;
+      i++; continue;
+    }
+
+    // ── Unordered list ─────────────────────────────────────────────
+    const ulMatch = line.match(/^(\s*)[-*+]\s+(.+)/);
+    if (ulMatch) {
+      if (inList !== 'ul') { flushList(); inList = 'ul'; }
+      listBuf += `<li>${inlineFormat(ulMatch[2])}</li>`;
+      i++; continue;
+    }
+
+    // ── Ordered list ───────────────────────────────────────────────
+    const olMatch = line.match(/^(\s*)\d+\.\s+(.+)/);
+    if (olMatch) {
+      if (inList !== 'ol') { flushList(); inList = 'ol'; }
+      listBuf += `<li>${inlineFormat(olMatch[2])}</li>`;
+      i++; continue;
+    }
+
+    // ── Table ──────────────────────────────────────────────────────
+    if (line.includes('|') && lines[i+1] && /^\|?[\s\-|:]+\|?$/.test(lines[i+1])) {
+      flushList();
+      const headers = line.split('|').map(c=>c.trim()).filter(Boolean);
+      let tbl = '<table><thead><tr>' + headers.map(h=>`<th>${inlineFormat(h)}</th>`).join('') + '</tr></thead><tbody>';
+      i += 2;
+      while (i < lines.length && lines[i].includes('|')) {
+        const cols = lines[i].split('|').map(c=>c.trim()).filter(Boolean);
+        tbl += '<tr>' + cols.map(c=>`<td>${inlineFormat(c)}</td>`).join('') + '</tr>';
+        i++;
+      }
+      tbl += '</tbody></table>';
+      html += tbl;
+      continue;
+    }
+
+    // ── Empty line → paragraph break ──────────────────────────────
+    if (line.trim() === '') {
+      flushList();
+      // peek ahead: if next non-empty line exists, we'll get a para break
+      html += '\n';
+      i++; continue;
+    }
+
+    // ── Normal paragraph text ──────────────────────────────────────
+    flushList();
+    html += `<p>${inlineFormat(line)}</p>`;
+    i++;
+  }
+
+  flushList();
+
+  // Collapse excessive newlines into paragraph breaks
+  html = html.replace(/\n{2,}/g, '\n');
+  return html;
+}
+</script>
+</body>
+</html>
